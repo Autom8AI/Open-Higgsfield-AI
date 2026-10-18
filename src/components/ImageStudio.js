@@ -1,4 +1,4 @@
-import { muapi } from '../lib/muapi.js';
+import { kie } from '../lib/kie.js';
 import {
     t2iModels, getAspectRatiosForModel, getResolutionsForModel, getQualityFieldForModel,
     i2iModels, getAspectRatiosForI2IModel, getResolutionsForI2IModel, getQualityFieldForI2IModel,
@@ -8,6 +8,17 @@ import { ENHANCE_TAGS, QUICK_PROMPTS } from '../lib/promptUtils.js';
 import { AuthModal } from './AuthModal.js';
 import { createUploadPicker } from './UploadPicker.js';
 import { savePendingJob, removePendingJob, getPendingJobs } from '../lib/pendingJobs.js';
+
+function createInlineInstructions(type) {
+    const el = document.createElement('div');
+    el.className = 'w-full text-center text-white/30 text-sm flex flex-col items-center gap-2 py-2';
+    const icon = type === 'image' ? '🖼️' : '🎬';
+    el.innerHTML = `
+        <p>${icon} Enter a prompt above and click <span class="text-primary font-semibold">Generate</span> to create your ${type}.</p>
+        <p class="text-xs text-white/20">Tip: Be descriptive — include style, lighting, mood, and subject for best results.</p>
+    `;
+    return el;
+}
 
 export function ImageStudio() {
     const container = document.createElement('div');
@@ -881,7 +892,7 @@ export function ImageStudio() {
         generationHistory.unshift(entry);
 
         // Save to localStorage
-        localStorage.setItem('muapi_history', JSON.stringify(generationHistory.slice(0, 50)));
+        localStorage.setItem('kie_history', JSON.stringify(generationHistory.slice(0, 50)));
 
         // Show sidebar
         historySidebar.classList.remove('translate-x-full', 'opacity-0');
@@ -907,7 +918,7 @@ export function ImageStudio() {
 
             thumb.onclick = (e) => {
                 if (e.target.closest('.hist-download')) {
-                    downloadImage(entry.url, `muapi-${entry.id || idx}.jpg`);
+                    downloadImage(entry.url, `kie-${entry.id || idx}.jpg`);
                     return;
                 }
                 showImageInCanvas(entry.url);
@@ -945,7 +956,7 @@ export function ImageStudio() {
 
     // --- Load history from localStorage ---
     try {
-        const saved = JSON.parse(localStorage.getItem('muapi_history') || '[]');
+        const saved = JSON.parse(localStorage.getItem('kie_history') || '[]');
         if (saved.length > 0) {
             saved.forEach(e => generationHistory.push(e));
             historySidebar.classList.remove('translate-x-full', 'opacity-0');
@@ -959,7 +970,7 @@ export function ImageStudio() {
         const pending = getPendingJobs('image');
         if (!pending.length) return;
 
-        const apiKey = localStorage.getItem('muapi_key');
+        const apiKey = localStorage.getItem('kie_key');
         if (!apiKey) return; // can't poll without key; jobs remain for next time
 
         const banner = document.createElement('div');
@@ -972,7 +983,7 @@ export function ImageStudio() {
             const elapsedAttempts = Math.floor((Date.now() - job.submittedAt) / job.interval);
             const attemptsLeft = Math.max(1, job.maxAttempts - elapsedAttempts);
             try {
-                const result = await muapi.pollForResult(job.requestId, apiKey, attemptsLeft, job.interval);
+                const result = await kie.pollForResult(job.requestId, apiKey, attemptsLeft, job.interval);
                 const url = result.outputs?.[0] || result.url || result.output?.url;
                 if (url) {
                     addToHistory({ id: job.requestId, url, ...job.historyMeta, timestamp: new Date().toISOString() });
@@ -993,7 +1004,7 @@ export function ImageStudio() {
         const current = resultImg.src;
         if (current) {
             const entry = generationHistory.find(e => e.url === current);
-            downloadImage(current, `muapi-${entry?.id || 'image'}.jpg`);
+            downloadImage(current, `kie-${entry?.id || 'image'}.jpg`);
         }
     };
 
@@ -1045,7 +1056,7 @@ export function ImageStudio() {
             }
         }
 
-        const apiKey = localStorage.getItem('muapi_key');
+        const apiKey = localStorage.getItem('kie_key');
         if (!apiKey) {
             AuthModal(() => generateBtn.click());
             return;
@@ -1076,7 +1087,7 @@ export function ImageStudio() {
                 if (prompt) genParams.prompt = prompt;
                 const qualityField = getCurrentQualityField(selectedModel);
                 if (qualityField && qualityLabel) genParams[qualityField] = qualityLabel;
-                res = await muapi.generateI2I(genParams);
+                res = await kie.generateI2I(genParams);
             } else {
                 const genParams = {
                     model: selectedModel,
@@ -1089,7 +1100,7 @@ export function ImageStudio() {
                 };
                 const qualityField = getCurrentQualityField(selectedModel);
                 if (qualityField && qualityLabel) genParams[qualityField] = qualityLabel;
-                res = await muapi.generateImage(genParams);
+                res = await kie.generateImage(genParams);
             }
 
             console.log('[ImageStudio] Full response:', res);

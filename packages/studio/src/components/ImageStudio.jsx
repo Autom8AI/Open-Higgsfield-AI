@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { generateImage, generateI2I, uploadFile } from "../muapi.js";
+import { generateImage, generateI2I, uploadFile } from "../kie.js";
 import {
   t2iModels,
   i2iModels,
@@ -858,7 +858,7 @@ export default function ImageStudio({ apiKey, onGenerationComplete, historyItems
                         title="Download"
                         onClick={(e) => {
                           e.stopPropagation();
-                          downloadImage(entry.url, `muapi-${entry.id || idx}.jpg`);
+                          downloadImage(entry.url, `kie-${entry.id || idx}.jpg`);
                         }}
                         className="p-1.5 bg-primary rounded-lg text-black hover:scale-110 transition-transform"
                       >
@@ -896,7 +896,7 @@ export default function ImageStudio({ apiKey, onGenerationComplete, historyItems
               type="button"
               onClick={() => {
                 const entry = history[activeHistoryIdx];
-                downloadImage(currentImageUrl, `muapi-${entry?.id || "image"}.jpg`);
+                downloadImage(currentImageUrl, `kie-${entry?.id || "image"}.jpg`);
               }}
               className="bg-primary text-black px-6 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-glow active:scale-95"
             >

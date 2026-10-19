@@ -41,11 +41,5 @@ navigate('image');
 
 // Event Listener for Navigation
 window.addEventListener('navigate', (e) => {
-  if (e.detail.page === 'settings') {
-    import('./components/SettingsModal.js').then(({ SettingsModal }) => {
-      document.body.appendChild(SettingsModal());
-    });
-  } else {
-    navigate(e.detail.page);
-  }
+  navigate(e.detail.page);
 });

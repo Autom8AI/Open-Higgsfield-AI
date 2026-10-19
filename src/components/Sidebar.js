@@ -22,10 +22,6 @@ export function Sidebar() {
     { id: 'library', icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>', label: 'Library' },
   ];
 
-  const bottomItems = [
-    { id: 'settings', icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>', label: 'Settings' }
-  ];
-
   let activeTab = 'image';
 
   const createButton = (item) => {
@@ -40,7 +36,7 @@ export function Sidebar() {
     label.textContent = item.label;
     label.className = 'text-[9px] font-bold uppercase tracking-widest text-secondary group-hover:text-white transition-colors';
 
-    if (activeTab === item.id && item.id !== 'settings') {
+    if (activeTab === item.id) {
       iconBtn.classList.add('active-nav-btn');
       iconBtn.style.color = 'var(--color-primary)';
       label.style.color = 'var(--color-primary)';
@@ -50,17 +46,15 @@ export function Sidebar() {
       const event = new CustomEvent('navigate', { detail: { page: item.id } });
       window.dispatchEvent(event);
 
-      if (item.id !== 'settings') {
-        activeTab = item.id;
-        element.querySelectorAll('.active-nav-btn').forEach(btn => {
-          btn.classList.remove('active-nav-btn');
-          btn.style.color = 'var(--text-secondary)';
-          btn.nextSibling.style.color = 'var(--text-secondary)';
-        });
-        iconBtn.classList.add('active-nav-btn');
-        iconBtn.style.color = 'var(--color-primary)';
-        label.style.color = 'var(--color-primary)';
-      }
+      activeTab = item.id;
+      element.querySelectorAll('.active-nav-btn').forEach(btn => {
+        btn.classList.remove('active-nav-btn');
+        btn.style.color = 'var(--text-secondary)';
+        btn.nextSibling.style.color = 'var(--text-secondary)';
+      });
+      iconBtn.classList.add('active-nav-btn');
+      iconBtn.style.color = 'var(--color-primary)';
+      label.style.color = 'var(--color-primary)';
     };
 
     container.appendChild(iconBtn);
@@ -75,7 +69,6 @@ export function Sidebar() {
 
   const bottomContainer = document.createElement('div');
   bottomContainer.className = 'flex flex-col w-full items-center mt-auto';
-  bottomItems.forEach(item => bottomContainer.appendChild(createButton(item)));
   element.appendChild(bottomContainer);
 
   return element;

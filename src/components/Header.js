@@ -1,4 +1,4 @@
-import { SettingsModal } from './SettingsModal.js';
+
 
 export function Header(navigate) {
     const header = document.createElement('header');
@@ -61,20 +61,6 @@ export function Header(navigate) {
 
     const rightPart = document.createElement('div');
     rightPart.className = 'flex items-center gap-4';
-
-    const keyBtn = document.createElement('button');
-    keyBtn.className = 'p-2 text-secondary hover:text-white transition-colors';
-    keyBtn.title = 'Update API Key';
-    keyBtn.innerHTML = `
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3m-3-3l-2.25-2.25"/>
-        </svg>
-    `;
-    keyBtn.onclick = () => {
-        document.body.appendChild(SettingsModal());
-    };
-
-    rightPart.appendChild(keyBtn);
 
     navBar.appendChild(leftPart);
     navBar.appendChild(rightPart);

@@ -1,0 +1,561 @@
+{
+  "_comment": [
+    "Generated from kie-catalog.json (scraped from every OpenAPI spec under",
+    "docs.kie.ai/market). Mechanical fields -- images.param, aspects, resolutions,",
+    "styleEnum -- come straight from those specs. Only label/blurb/kind are editorial.",
+    "",
+    "Never hand-write an image param: nano-banana-2 uses image_input but",
+    "nano-banana-2-lite uses image_urls, and the wrong one is accepted silently.",
+    "",
+    "No credits here: kie.ai publishes no pricing, so /api/pricing measures it",
+    "per (model, resolution) from real runs."
+  ],
+  "models": [
+    {
+      "id": "nano-banana-pro",
+      "label": "Nano Banana Pro",
+      "kind": "image",
+      "api": "jobs",
+      "blurb": "Highest-fidelity Nano Banana. Edits or text-to-image.",
+      "images": {
+        "param": "image_input",
+        "max": 14,
+        "required": false
+      },
+      "aspects": [
+        "1:1",
+        "2:3",
+        "3:2",
+        "3:4",
+        "4:3",
+        "4:5",
+        "5:4",
+        "9:16",
+        "16:9",
+        "21:9",
+        "auto"
+      ],
+      "resolutions": [
+        "1K",
+        "2K",
+        "4K"
+      ],
+      "resolutionDefault": "1K"
+    },
+    {
+      "id": "nano-banana-2",
+      "label": "Nano Banana 2",
+      "kind": "image",
+      "api": "jobs",
+      "blurb": "Best all-round. Text-to-image, or supply references to edit.",
+      "images": {
+        "param": "image_input",
+        "max": 14,
+        "required": false
+      },
+      "aspects": [
+        "1:1",
+        "1:4",
+        "1:8",
+        "2:3",
+        "3:2",
+        "3:4",
+        "4:1",
+        "4:3",
+        "4:5",
+        "5:4",
+        "8:1",
+        "9:16",
+        "16:9",
+        "21:9",
+        "auto"
+      ],
+      "resolutions": [
+        "1K",
+        "2K",
+        "4K"
+      ],
+      "resolutionDefault": "1K"
+    },
+    {
+      "id": "nano-banana-2-lite",
+      "label": "Nano Banana 2 Lite",
+      "kind": "image",
+      "api": "jobs",
+      "blurb": "Cheaper, faster Nano Banana 2.",
+      "images": {
+        "param": "image_urls",
+        "max": 10,
+        "required": false
+      },
+      "aspects": [
+        "1:1",
+        "1:4",
+        "1:8",
+        "2:3",
+        "3:2",
+        "3:4",
+        "4:1",
+        "4:3",
+        "4:5",
+        "5:4",
+        "8:1",
+        "9:16",
+        "16:9",
+        "21:9",
+        "auto"
+      ]
+    },
+    {
+      "id": "gpt-image-2-image-to-image",
+      "label": "GPT Image 2 \u2014 Edit",
+      "kind": "image",
+      "api": "jobs",
+      "blurb": "Edits an uploaded photo. Legible text.",
+      "images": {
+        "param": "input_urls",
+        "max": 10,
+        "required": false
+      },
+      "aspects": [
+        "auto",
+        "1:1",
+        "3:2",
+        "2:3",
+        "4:3",
+        "3:4",
+        "5:4",
+        "4:5",
+        "16:9",
+        "9:16",
+        "2:1",
+        "1:2",
+        "3:1",
+        "1:3",
+        "21:9",
+        "9:21"
+      ],
+      "resolutions": [
+        "1K",
+        "2K",
+        "4K"
+      ],
+      "resolutionDefault": null
+    },
+    {
+      "id": "gpt-image-2-text-to-image",
+      "label": "GPT Image 2",
+      "kind": "image",
+      "api": "jobs",
+      "blurb": "Strong prompt adherence and legible text.",
+      "aspects": [
+        "auto",
+        "1:1",
+        "3:2",
+        "2:3",
+        "4:3",
+        "3:4",
+        "5:4",
+        "4:5",
+        "16:9",
+        "9:16",
+        "2:1",
+        "1:2",
+        "3:1",
+        "1:3",
+        "21:9",
+        "9:21"
+      ],
+      "resolutions": [
+        "1K",
+        "2K",
+        "4K"
+      ],
+      "resolutionDefault": null
+    },
+    {
+      "id": "google/nano-banana-edit",
+      "label": "Nano Banana Edit",
+      "kind": "image",
+      "api": "jobs",
+      "blurb": "Cheapest edit model.",
+      "images": {
+        "param": "image_urls",
+        "max": 10,
+        "required": false
+      },
+      "aspects": [
+        "1:1",
+        "9:16",
+        "16:9",
+        "3:4",
+        "4:3",
+        "3:2",
+        "2:3",
+        "5:4",
+        "4:5",
+        "21:9",
+        "auto"
+      ]
+    },
+    {
+      "id": "google/nano-banana",
+      "label": "Nano Banana",
+      "kind": "image",
+      "api": "jobs",
+      "blurb": "Text-to-image only.",
+      "aspects": [
+        "1:1",
+        "9:16",
+        "16:9",
+        "3:4",
+        "4:3",
+        "3:2",
+        "2:3",
+        "5:4",
+        "4:5",
+        "21:9",
+        "auto"
+      ]
+    },
+    {
+      "id": "ideogram/v3-text-to-image",
+      "label": "Ideogram v3",
+      "kind": "image",
+      "api": "jobs",
+      "blurb": "The only image model with a real style parameter.",
+      "styleEnum": [
+        "AUTO",
+        "GENERAL",
+        "REALISTIC",
+        "DESIGN"
+      ]
+    },
+    {
+      "id": "bytedance/seedance-2",
+      "label": "Seedance 2.0",
+      "kind": "video",
+      "api": "jobs",
+      "blurb": "Flagship video. Billed per second.",
+      "images": {
+        "param": "reference_image_urls",
+        "max": 10,
+        "required": false
+      },
+      "aspects": [
+        "1:1",
+        "4:3",
+        "3:4",
+        "16:9",
+        "9:16",
+        "21:9",
+        "adaptive"
+      ],
+      "resolutions": [
+        "480p",
+        "720p",
+        "1080p",
+        "4k"
+      ],
+      "resolutionDefault": "720p",
+      "hasDuration": true
+    },
+    {
+      "id": "bytedance/seedance-2-fast",
+      "label": "Seedance 2.0 Fast",
+      "kind": "video",
+      "api": "jobs",
+      "blurb": "Faster Seedance 2 tier.",
+      "images": {
+        "param": "reference_image_urls",
+        "max": 10,
+        "required": false
+      },
+      "aspects": [
+        "1:1",
+        "4:3",
+        "3:4",
+        "16:9",
+        "9:16",
+        "21:9",
+        "adaptive"
+      ],
+      "resolutions": [
+        "480p",
+        "720p"
+      ],
+      "resolutionDefault": "720p",
+      "hasDuration": true
+    },
+    {
+      "id": "bytedance/seedance-1.5-pro",
+      "label": "Seedance 1.5 Pro",
+      "kind": "video",
+      "api": "jobs",
+      "blurb": "Cinematic, with audio.",
+      "images": {
+        "param": "input_urls",
+        "max": 10,
+        "required": false
+      },
+      "aspects": [
+        "1:1",
+        "4:3",
+        "3:4",
+        "16:9",
+        "9:16",
+        "21:9"
+      ],
+      "resolutions": [
+        "480p",
+        "720p",
+        "1080p"
+      ],
+      "resolutionDefault": "720p",
+      "hasDuration": true
+    },
+    {
+      "id": "kling-3.0/video",
+      "label": "Kling 3.0",
+      "kind": "video",
+      "api": "jobs",
+      "blurb": "First/last frame control.",
+      "images": {
+        "param": "image_urls",
+        "max": 10,
+        "required": false
+      },
+      "aspects": [
+        "16:9",
+        "9:16",
+        "1:1"
+      ],
+      "hasDuration": true
+    },
+    {
+      "id": "kling/v3-turbo-text-to-video",
+      "label": "Kling 3 Turbo",
+      "kind": "video",
+      "api": "jobs",
+      "blurb": "Faster Kling tier.",
+      "aspects": [
+        "1:1",
+        "9:16",
+        "16:9"
+      ],
+      "resolutions": [
+        "720p",
+        "1080p"
+      ],
+      "resolutionDefault": "720p",
+      "hasDuration": true
+    },
+    {
+      "id": "wan/2-5-text-to-video",
+      "label": "Wan 2.5",
+      "kind": "video",
+      "api": "jobs",
+      "blurb": "Open-source video.",
+      "aspects": [
+        "16:9",
+        "9:16",
+        "1:1"
+      ],
+      "resolutions": [
+        "720p",
+        "1080p"
+      ],
+      "resolutionDefault": null,
+      "hasDuration": true
+    },
+    {
+      "id": "happyhorse-1-1/text-to-video",
+      "label": "HappyHorse 1.1",
+      "kind": "video",
+      "api": "jobs",
+      "blurb": "The only video model that supports 4:5.",
+      "aspects": [
+        "16:9",
+        "9:16",
+        "1:1",
+        "4:3",
+        "3:4",
+        "4:5",
+        "5:4",
+        "9:21",
+        "21:9"
+      ],
+      "resolutions": [
+        "720p",
+        "1080p"
+      ],
+      "resolutionDefault": "1080p",
+      "hasDuration": true
+    },
+    {
+      "id": "happyhorse-1-1/reference-to-video",
+      "label": "HappyHorse 1.1 \u2014 Reference",
+      "kind": "video",
+      "api": "jobs",
+      "blurb": "Reference-driven. Supports 4:5.",
+      "aspects": [
+        "16:9",
+        "9:16",
+        "3:4",
+        "4:3",
+        "4:5",
+        "5:4",
+        "1:1",
+        "9:21",
+        "21:9"
+      ],
+      "resolutions": [
+        "720p",
+        "1080p"
+      ],
+      "resolutionDefault": "1080p",
+      "hasDuration": true
+    },
+    {
+      "id": "wan/2-2-a14b-speech-to-video-turbo",
+      "label": "Wan 2.2 Speech-to-Video Turbo",
+      "kind": "talk",
+      "api": "jobs",
+      "blurb": "Only lip-sync model with a real motion knob (guidance_scale) and a negative prompt.",
+      "portrait": "image_url",
+      "audio": "audio_url",
+      "resolutionField": "resolution",
+      "resolutions": [
+        "480p",
+        "580p",
+        "720p"
+      ],
+      "resolutionDefault": "480p",
+      "guidance": [
+        1.5,
+        7.0
+      ],
+      "fields": []
+    },
+    {
+      "id": "kling/ai-avatar-pro",
+      "label": "Kling AI Avatar \u2014 Pro",
+      "kind": "talk",
+      "api": "jobs",
+      "blurb": "Highest realism and facial detail. Audio up to 5 minutes.",
+      "portrait": "image_url",
+      "audio": "audio_url",
+      "promptRequired": true,
+      "fields": [],
+      "audioMaxSeconds": 300
+    },
+    {
+      "id": "omnihuman-1-5",
+      "label": "OmniHuman 1.5",
+      "kind": "talk",
+      "api": "jobs",
+      "blurb": "ByteDance. Natural upper-body motion. Audio under 60 seconds.",
+      "portrait": "image_url",
+      "audio": "audio_url",
+      "fields": [
+        {
+          "name": "output_resolution",
+          "label": "Resolution",
+          "type": "select",
+          "options": [
+            "720",
+            "1080"
+          ],
+          "default": "1080"
+        }
+      ],
+      "resolutionField": "output_resolution",
+      "resolutions": [
+        "720",
+        "1080"
+      ],
+      "resolutionDefault": "1080",
+      "audioMaxSeconds": 60
+    },
+    {
+      "id": "kling/ai-avatar-standard",
+      "label": "Kling AI Avatar \u2014 Standard",
+      "kind": "talk",
+      "api": "jobs",
+      "blurb": "Cheaper Kling tier. Stable lip-sync, less facial detail.",
+      "portrait": "image_url",
+      "audio": "audio_url",
+      "promptRequired": true,
+      "fields": [],
+      "audioMaxSeconds": 300
+    },
+    {
+      "id": "infinitalk/from-audio",
+      "label": "InfiniteTalk",
+      "kind": "talk",
+      "api": "jobs",
+      "blurb": "Open-source. Long-form talking video from one portrait.",
+      "portrait": "image_url",
+      "audio": "audio_url",
+      "fields": [
+        {
+          "name": "resolution",
+          "label": "Resolution",
+          "type": "select",
+          "options": [
+            "480p",
+            "720p"
+          ],
+          "default": "480p"
+        }
+      ],
+      "resolutionField": "resolution",
+      "resolutions": [
+        "480p",
+        "720p"
+      ],
+      "resolutionDefault": "480p"
+    },
+    {
+      "id": "elevenlabs/text-to-speech-multilingual-v2",
+      "label": "ElevenLabs Multilingual v2",
+      "kind": "tts",
+      "api": "jobs",
+      "blurb": "Turns dialogue text into the audio the lip-sync models require.",
+      "fields": [
+        {
+          "name": "stability",
+          "label": "Stability",
+          "type": "range",
+          "min": 0,
+          "max": 1,
+          "default": 0.5
+        },
+        {
+          "name": "similarity_boost",
+          "label": "Similarity",
+          "type": "range",
+          "min": 0,
+          "max": 1,
+          "default": 0.75
+        },
+        {
+          "name": "style",
+          "label": "Emotion",
+          "type": "range",
+          "min": 0,
+          "max": 1,
+          "default": 0
+        },
+        {
+          "name": "speed",
+          "label": "Speed",
+          "type": "range",
+          "min": 0.7,
+          "max": 1.2,
+          "default": 1
+        }
+      ]
+    }
+  ]
+}

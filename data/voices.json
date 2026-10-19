@@ -1,0 +1,337 @@
+[
+ {
+  "id": "EkK5I93UQWFDigLMpZcX",
+  "name": "James",
+  "desc": "Husky, Engaging and Bold"
+ },
+ {
+  "id": "Z3R5wn05IrDiVCyEkUrK",
+  "name": "Arabella",
+  "desc": "Mysterious and Emotive"
+ },
+ {
+  "id": "NNl6r8mD7vthiJatiJt1",
+  "name": "Bradford",
+  "desc": "Expressive and Articulate"
+ },
+ {
+  "id": "YOq2y2Up4RgXP2HyXjE5",
+  "name": "Xavier",
+  "desc": "Dominating, Metallic Announcer"
+ },
+ {
+  "id": "B8gJV1IhpuegLxdpXFOE",
+  "name": "Kuon",
+  "desc": "Cheerful, Clear and Steady"
+ },
+ {
+  "id": "2zRM7PkgwBPiau2jvVXc",
+  "name": "Monika Sogam",
+  "desc": "Deep and Natural"
+ },
+ {
+  "id": "1SM7GgM6IMuvQlz2BwM3",
+  "name": "Mark",
+  "desc": "Casual, Relaxed and Light"
+ },
+ {
+  "id": "5l5f8iK3YPeGga21rQIX",
+  "name": "Adeline",
+  "desc": "Feminine and Conversational"
+ },
+ {
+  "id": "scOwDtmlUjD3prqpp97I",
+  "name": "Sam",
+  "desc": "Support Agent"
+ },
+ {
+  "id": "NOpBlnGInO9m6vDvFkFC",
+  "name": "Spuds Oxley",
+  "desc": "Wise and Approachable"
+ },
+ {
+  "id": "BZgkqPqms7Kj9ulSkVzn",
+  "name": "Eve",
+  "desc": "Authentic, Energetic and Happy"
+ },
+ {
+  "id": "wo6udizrrtpIxWGp2qJk",
+  "name": "Northern Terry",
+  "desc": ""
+ },
+ {
+  "id": "gU0LNdkMOQCOrPrwtbee",
+  "name": "British Football Announcer",
+  "desc": ""
+ },
+ {
+  "id": "DGzg6RaUqxGRTHSBjfgF",
+  "name": "Brock",
+  "desc": "Commanding and Loud Sergeant"
+ },
+ {
+  "id": "x70vRnQBMBu4FAYhjJbO",
+  "name": "Nathan",
+  "desc": "Virtual Radio Host"
+ },
+ {
+  "id": "Sm1seazb4gs7RSlUVw7c",
+  "name": "Anika",
+  "desc": "Animated, Friendly and Engaging"
+ },
+ {
+  "id": "P1bg08DkjqiVEzOn76yG",
+  "name": "Viraj",
+  "desc": "Rich and Soft"
+ },
+ {
+  "id": "qDuRKMlYmrm8trt5QyBn",
+  "name": "Taksh",
+  "desc": "Calm, Serious and Smooth"
+ },
+ {
+  "id": "qXpMhyvQqiRxWQs4qSSB",
+  "name": "Horatius",
+  "desc": "Energetic Character Voice"
+ },
+ {
+  "id": "TX3LPaxmHKxFdv7VOQHJ",
+  "name": "Liam",
+  "desc": "Energetic, Social Media Creator"
+ },
+ {
+  "id": "N2lVS1w4EtoT3dr4eOWO",
+  "name": "Callum",
+  "desc": "Husky Trickster"
+ },
+ {
+  "id": "FGY2WhTYpPnrIDTdsKH5",
+  "name": "Laura",
+  "desc": "Enthusiast, Quirky Attitude"
+ },
+ {
+  "id": "kPzsL2i3teMYv0FxEYQ6",
+  "name": "Brittney",
+  "desc": "Social Media Voice - Fun, Youthful & Informative"
+ },
+ {
+  "id": "UgBBYS2sOqTuMpoF3BR0",
+  "name": "Mark",
+  "desc": "Natural Conversations"
+ },
+ {
+  "id": "hpp4J3VqNfWAUOO0d1Us",
+  "name": "Bella",
+  "desc": "Professional, Bright, Warm"
+ },
+ {
+  "id": "nPczCjzI2devNBz1zQrb",
+  "name": "Brian",
+  "desc": "Deep, Resonant and Comforting"
+ },
+ {
+  "id": "uYXf8XasLslADfZ2MB4u",
+  "name": "Hope",
+  "desc": "Bubbly, Gossipy and Girly"
+ },
+ {
+  "id": "gs0tAILXbY5DNrJrsM6F",
+  "name": "Jeff",
+  "desc": "Classy, Resonating and Strong"
+ },
+ {
+  "id": "DTKMou8ccj1ZaWGBiotd",
+  "name": "Jamahal",
+  "desc": "Young, Vibrant, and Natural"
+ },
+ {
+  "id": "vBKc2FfBKJfcZNyEt1n6",
+  "name": "Finn",
+  "desc": "Youthful, Eager and Energetic"
+ },
+ {
+  "id": "DYkrAHD8iwork3YSUBbs",
+  "name": "Tom",
+  "desc": "Conversations & Books"
+ },
+ {
+  "id": "56AoDkrOh6qfVPDXZ7Pt",
+  "name": "Cassidy",
+  "desc": "Crisp, Direct and Clear"
+ },
+ {
+  "id": "eR40ATw9ArzDf9h3v7t7",
+  "name": "Addison 2.0",
+  "desc": "Australian Audiobook & Podcast"
+ },
+ {
+  "id": "g6xIsTj2HwM6VR4iXFCw",
+  "name": "Jessica Anne Bogart",
+  "desc": "Chatty and Friendly"
+ },
+ {
+  "id": "lcMyyd2HUfFzxdCaC4Ta",
+  "name": "Lucy",
+  "desc": "Fresh & Casual"
+ },
+ {
+  "id": "6aDn1KB0hjpdcocrUkmq",
+  "name": "Tiffany",
+  "desc": "Natural and Welcoming"
+ },
+ {
+  "id": "Sq93GQT4X1lKDXsQcixO",
+  "name": "Felix",
+  "desc": "Warm, Positive & Contemporary RP"
+ },
+ {
+  "id": "flHkNRp1BlvT73UL6gyz",
+  "name": "Jessica Anne Bogart",
+  "desc": "Eloquent Villain"
+ },
+ {
+  "id": "9yzdeviXkFddZ4Oz8Mok",
+  "name": "Lutz",
+  "desc": "Chuckling, Giggly and Cheerful"
+ },
+ {
+  "id": "pPdl9cQBQq4p6mRkZy2Z",
+  "name": "Emma",
+  "desc": "Adorable and Upbeat"
+ },
+ {
+  "id": "zYcjlYFOd3taleS0gkk3",
+  "name": "Edward",
+  "desc": "Loud, Confident and Cocky"
+ },
+ {
+  "id": "nzeAacJi50IvxcyDnMXa",
+  "name": "Marshal",
+  "desc": "Friendly, Funny Professor"
+ },
+ {
+  "id": "ruirxsoakN0GWmGNIo04",
+  "name": "John Morgan",
+  "desc": "Gritty, Rugged Cowboy"
+ },
+ {
+  "id": "TC0Zp7WVFzhA8zpTlRqV",
+  "name": "Aria",
+  "desc": "Sultry Villain"
+ },
+ {
+  "id": "ljo9gAlSqKOvF6D8sOsX",
+  "name": "Viking Bjorn",
+  "desc": "Epic Medieval Raider"
+ },
+ {
+  "id": "PPzYpIqttlTYA83688JI",
+  "name": "Pirate Marshal",
+  "desc": ""
+ },
+ {
+  "id": "8JVbfL6oEdmuxKn5DK2C",
+  "name": "Johnny Kid",
+  "desc": "Serious and Calm Narrator"
+ },
+ {
+  "id": "iCrDUkL56s3C8sCRl7wb",
+  "name": "Hope",
+  "desc": "Poetic, Romantic and Captivating"
+ },
+ {
+  "id": "wJqPPQ618aTW29mptyoc",
+  "name": "Ana Rita",
+  "desc": "Smooth, Expressive and Bright"
+ },
+ {
+  "id": "EiNlNiXeDU1pqqOPrYMO",
+  "name": "John Doe",
+  "desc": "Deep"
+ },
+ {
+  "id": "4YYIPFl9wE5c4L2eu2Gb",
+  "name": "Burt Reynolds\u2122",
+  "desc": "Deep, Smooth and Clear"
+ },
+ {
+  "id": "6F5Zhi321D3Oq7v1oNT4",
+  "name": "Hank",
+  "desc": "Deep and Engaging Narrator"
+ },
+ {
+  "id": "YXpFCvM1S3JbWEJhoskW",
+  "name": "Wyatt",
+  "desc": "Wise Rustic Cowboy"
+ },
+ {
+  "id": "LG95yZDEHg6fCZdQjLqj",
+  "name": "Phil",
+  "desc": "Explosive, Passionate Announcer"
+ },
+ {
+  "id": "CeNX9CMwmxDxUF5Q2Inm",
+  "name": "Johnny Dynamite",
+  "desc": "Vintage Radio DJ"
+ },
+ {
+  "id": "aD6riP1btT197c6dACmy",
+  "name": "Rachel M",
+  "desc": "Pro British Radio Presenter"
+ },
+ {
+  "id": "mtrellq69YZsNwzUSyXh",
+  "name": "Rex Thunder",
+  "desc": "Deep N Tough"
+ },
+ {
+  "id": "dHd5gvgSOzSfduK4CvEg",
+  "name": "Ed",
+  "desc": "Late Night Announcer"
+ },
+ {
+  "id": "eVItLK1UvXctxuaRV2Oq",
+  "name": "Jean",
+  "desc": "Alluring and Playful Femme Fatale"
+ },
+ {
+  "id": "esy0r39YPLQjOczyOib8",
+  "name": "Britney",
+  "desc": "Calm and Calculative Villain"
+ },
+ {
+  "id": "Tsns2HvNFKfGiNjllgqo",
+  "name": "Sven",
+  "desc": "Emotional and Nice"
+ },
+ {
+  "id": "1U02n4nD6AdIZ9CjF053",
+  "name": "Viraj",
+  "desc": "Smooth and Gentle"
+ },
+ {
+  "id": "AeRdCCKzvd23BpJoofzx",
+  "name": "Nathaniel",
+  "desc": "Engaging, British and Calm"
+ },
+ {
+  "id": "LruHrtVF6PSyGItzMNHS",
+  "name": "Benjamin",
+  "desc": "Deep, Warm, Calming"
+ },
+ {
+  "id": "1wGbFxmAM3Fgw63G1zZJ",
+  "name": "Allison",
+  "desc": "Calm, Soothing and Meditative"
+ },
+ {
+  "id": "hqfrgApggtO1785R4Fsn",
+  "name": "Theodore HQ",
+  "desc": "Serene and Grounded"
+ },
+ {
+  "id": "MJ0RnG71ty4LH3dvNfSd",
+  "name": "Leon",
+  "desc": "Soothing and Grounded"
+ }
+]

@@ -1,6 +1,14 @@
 import { getModelById, getVideoModelById, getI2IModelById, getI2VModelById } from './models.js';
+import * as cf from './api.js';
 
 const KIE_BASE = 'https://api.kie.ai';
+
+// When the content-factory backend session is active (cf marker in
+// localStorage), generation goes through the /api function bridge instead.
+const cfPath = () => {
+    if (!localStorage.getItem('cf_backend')) return null;
+    return cf;
+};
 
 export class KieClient {
     constructor() {
@@ -123,6 +131,9 @@ export class KieClient {
     }
 
     async pollForResult(requestId, key, maxAttempts = 300, interval = 2000) {
+        if (String(requestId).startsWith('cf:')) {
+            return cf.resumePoll(requestId, maxAttempts, interval);
+        }
         key = key || this.getKey();
         if (requestId.startsWith('veo:')) {
             return this.pollVeo(requestId.slice('veo:'.length), key, maxAttempts, interval);
@@ -227,6 +238,8 @@ export class KieClient {
      * Generates an image (Text-to-Image or Image-to-Image)
      */
     async generateImage(params) {
+        const bridge = cfPath();
+        if (bridge) return bridge.generateImage(params);
         const modelInfo = this._imageModel(params.model);
         const settings = { mode: params.image_url ? 'image_input' : null };
         const input = this._imageInput(params, settings);
@@ -241,6 +254,8 @@ export class KieClient {
      * Generates an image using an Image-to-Image model.
      */
     async generateI2I(params) {
+        const bridge = cfPath();
+        if (bridge) return bridge.generateI2I(params);
         const settings = this._editModel(params.model);
         const input = this._imageInput(params, settings);
 
@@ -254,6 +269,8 @@ export class KieClient {
      * Generates a video (Text-to-Video or Image-to-Video)
      */
     async generateVideo(params) {
+        const bridge = cfPath();
+        if (bridge) return bridge.generateVideo(params);
         const settings = this._videoModel(params.model, 't2v', !!params.image_url);
         return this._runVideo(settings, params);
     }
@@ -262,6 +279,8 @@ export class KieClient {
      * Generates a video using an Image-to-Video model.
      */
     async generateI2V(params) {
+        const bridge = cfPath();
+        if (bridge) return bridge.generateI2V(params);
         const settings = this._videoModel(params.model, 'i2v', !!params.image_url);
         return this._runVideo(settings, params);
     }
@@ -326,6 +345,8 @@ export class KieClient {
      * Processes lipsync / speech-to-video generation.
      */
     async processLipSync(params) {
+        const bridge = cfPath();
+        if (bridge) return bridge.processLipSync(params);
         const key = this.getKey();
         void key;
 
@@ -365,6 +386,8 @@ export class KieClient {
      * Note: uploaded files expire after 24 hours.
      */
     async uploadFile(file) {
+        const bridge = cfPath();
+        if (bridge) return bridge.uploadFile(file);
         const key = this.getKey();
         const url = `${this.baseUrl}/api/v1/file-stream-upload`;
 

@@ -1,3 +1,5 @@
+import { BackendModal } from './BackendModal.js';
+
 export function AuthModal(onSuccess) {
     const overlay = document.createElement('div');
     overlay.className = 'fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm px-6';
@@ -34,6 +36,9 @@ export function AuthModal(onSuccess) {
                 <a href="https://kie.ai/api-key" target="_blank" class="text-center text-[11px] font-bold text-muted hover:text-white transition-colors py-2 uppercase tracking-tighter">
                     Get an API Key at kie.ai →
                 </a>
+                <button id="backend-login-btn" class="w-full border border-white/10 text-white font-bold py-3 rounded-2xl hover:bg-white/5 transition-all text-sm">
+                    Or sign in with content-factory →
+                </button>
             </div>
         </div>
     `;
@@ -54,6 +59,11 @@ export function AuthModal(onSuccess) {
             input.classList.add('border-red-500/50');
             setTimeout(() => input.classList.remove('border-red-500/50'), 2000);
         }
+    };
+
+    modal.querySelector('#backend-login-btn').onclick = () => {
+        document.body.removeChild(overlay);
+        document.body.appendChild(BackendModal(onSuccess));
     };
 
     return overlay;

@@ -1,0 +1,8 @@
+/app.js
+  Cache-Control: no-store, max-age=0
+
+/app-core.js
+  Cache-Control: no-store, max-age=0
+
+/index.html
+  Cache-Control: no-store, max-age=0

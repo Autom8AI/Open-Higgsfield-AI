@@ -971,7 +971,8 @@ export function ImageStudio() {
         if (!pending.length) return;
 
         const apiKey = localStorage.getItem('kie_key');
-        if (!apiKey) return; // can't poll without key; jobs remain for next time
+        const cfLogged = !!localStorage.getItem('cf_backend');
+        if (!apiKey && !localStorage.getItem('cf_backend')) return; // can't poll without key; jobs remain for next time
 
         const banner = document.createElement('div');
         banner.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-[#111] border border-white/10 text-white text-sm px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3';
@@ -1057,7 +1058,8 @@ export function ImageStudio() {
         }
 
         const apiKey = localStorage.getItem('kie_key');
-        if (!apiKey) {
+        const cfLogged = !!localStorage.getItem('cf_backend');
+        if (!apiKey && !cfLogged) {
             AuthModal(() => generateBtn.click());
             return;
         }

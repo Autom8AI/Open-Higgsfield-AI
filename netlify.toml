@@ -2,16 +2,31 @@
   base = "."
   command = "npm install && npx vite build"
   publish = "dist"
+  functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "22"
 
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+[functions]
+  included_files = ["data/models.json"]
+
+# Same-origin streaming route for media downloads.
+[[edge_functions]]
+  function = "media-download"
+  path = "/download-media"
 
 [[headers]]
   for = "/*"
   [headers.values]
     X-Frame-Options = "DENY"
+
+# Content-factory function API surface (must come before the SPA catch-all).
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

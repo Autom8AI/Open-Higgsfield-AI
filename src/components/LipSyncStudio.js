@@ -169,7 +169,8 @@ export function LipSyncStudio() {
         const file = e.target.files[0];
         if (!file) return;
         const apiKey = localStorage.getItem('kie_key');
-        if (!apiKey) { AuthModal(() => videoFileInput.click()); return; }
+        const cfLogged = !!localStorage.getItem('cf_backend');
+        if (!apiKey && !cfLogged) { AuthModal(() => videoFileInput.click()); return; }
         showVideoSpinner();
         try {
             uploadedVideoUrl = await kie.uploadFile(file);
@@ -237,7 +238,8 @@ export function LipSyncStudio() {
         const file = e.target.files[0];
         if (!file) return;
         const apiKey = localStorage.getItem('kie_key');
-        if (!apiKey) { AuthModal(() => audioFileInput.click()); return; }
+        const cfLogged = !!localStorage.getItem('cf_backend');
+        if (!apiKey && !cfLogged) { AuthModal(() => audioFileInput.click()); return; }
         showAudioSpinner();
         try {
             uploadedAudioUrl = await kie.uploadFile(file);
@@ -588,7 +590,8 @@ export function LipSyncStudio() {
         const pending = getPendingJobs('lipsync');
         if (!pending.length) return;
         const apiKey = localStorage.getItem('kie_key');
-        if (!apiKey) return;
+        const cfLogged = !!localStorage.getItem('cf_backend');
+        if (!apiKey && !localStorage.getItem('cf_backend')) return;
         const banner = document.createElement('div');
         banner.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-[#111] border border-white/10 text-white text-sm px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3';
         banner.innerHTML = `<span class="animate-spin text-primary">◌</span> <span class="banner-text">Resuming ${pending.length} pending generation${pending.length > 1 ? 's' : ''}…</span>`;
@@ -668,7 +671,8 @@ export function LipSyncStudio() {
         }
 
         const apiKey = localStorage.getItem('kie_key');
-        if (!apiKey) { AuthModal(() => generateBtn.click()); return; }
+        const cfLogged = !!localStorage.getItem('cf_backend');
+        if (!apiKey && !cfLogged) { AuthModal(() => generateBtn.click()); return; }
 
         hero.classList.add('opacity-0', 'scale-95', '-translate-y-10', 'pointer-events-none');
         generateBtn.disabled = true;

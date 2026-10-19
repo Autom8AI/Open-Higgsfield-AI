@@ -538,7 +538,8 @@ export function CinemaStudio() {
         if (!basePrompt) return;
 
         const apiKey = localStorage.getItem('kie_key');
-        if (!apiKey) {
+        const cfLogged = !!localStorage.getItem('cf_backend');
+        if (!apiKey && !cfLogged) {
             AuthModal(() => generateBtn.click());
             return;
         }

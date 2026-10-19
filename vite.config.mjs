@@ -12,6 +12,16 @@ export default defineConfig({
                 target: 'https://api.kie.ai',
                 changeOrigin: true,
                 secure: false
+            },
+            '/.netlify/functions': {
+                target: 'https://higgsfield-matu.netlify.app',
+                changeOrigin: true,
+                secure: true
+            },
+            '/download-media': {
+                target: 'https://higgsfield-matu.netlify.app',
+                changeOrigin: true,
+                secure: true
             }
         }
     }

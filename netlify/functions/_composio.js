@@ -12,6 +12,16 @@ const PROJECT_ID = process.env.COMPOSIO_PROJECT_ID || 'pr_fb2sLe69ksF_'
 const apiKey = () => String(process.env.COMPOSIO_API_KEY || '').trim()
 const hasComposio = () => Boolean(apiKey())
 
+// ak_ keys are org keys sent via x-api-key; uak_ keys are user keys that need
+// the org/project headers. Both are accepted by the v3.1 proxy.
+const authHeadersFor = () => apiKey().startsWith('ak_')
+  ? { 'x-api-key': apiKey() }
+  : {
+      'x-user-api-key': apiKey(),
+      'x-org-id': ORG_ID,
+      'x-project-id': PROJECT_ID,
+    }
+
 let accountCache = { at: 0, items: [] }
 
 async function listAccounts() {
@@ -20,12 +30,7 @@ async function listAccounts() {
   }
   if (!hasComposio()) throw new Error('Composio credentials are not configured (COMPOSIO_API_KEY).')
   const res = await fetch(`${BASE}/connected_accounts?limit=100`, {
-    headers: {
-      'x-user-api-key': apiKey(),
-      'x-org-id': ORG_ID,
-      'x-project-id': PROJECT_ID,
-      Accept: 'application/json',
-    },
+    headers: { ...authHeadersFor(), Accept: 'application/json' },
   })
   const text = await res.text()
   let body = {}
@@ -61,13 +66,7 @@ async function proxyExecute(accountId, endpoint, method = 'GET', body = undefine
   if (body !== undefined) payload.body = body
   const res = await fetch(`${BASE}/tools/execute/proxy`, {
     method: 'POST',
-    headers: {
-      'x-user-api-key': apiKey(),
-      'x-org-id': ORG_ID,
-      'x-project-id': PROJECT_ID,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
+    headers: { ...authHeadersFor(), 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify(payload),
   })
   const text = await res.text()

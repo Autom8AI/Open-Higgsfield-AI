@@ -1,10 +1,14 @@
-// Shared kie.ai transport + model registry.
+// Shared kie.ai transport + model registry + Composio-backed environment checks.
 const REGISTRY = require('../../data/models.json')
+const composio = require('./_composio')
 
 const JOBS_BASE = 'https://api.kie.ai/api/v1/jobs'
 const UPLOAD_URL = 'https://kieai.redpandaai.co/api/file-base64-upload'
 
-const kieKey = () => process.env.KIE_API_KEY || process.env.KIE_AI_API_KEY
+const kieKey = () => {
+  const key = process.env.KIE_API_KEY || process.env.KIE_AI_API_KEY
+  return String(key || '').trim()
+}
 const hasAirtableCredential = () => Boolean(
   process.env.AIRTABLE_AUTH
   || process.env.AIRTABLE_API_KEY
@@ -29,14 +33,28 @@ function json(statusCode, body) {
 }
 
 const authHeaders = (key = kieKey()) => ({
-  Authorization: `Bearer ${key}`,
+  Authorization: `Bearer ${String(key || '').trim()}`,
   'Content-Type': 'application/json',
 })
 
+// Per-account Kie key is required; callers that have no key fail loudly.
+function requireKieKey(key) {
+  const resolved = String(key || kieKey() || '').trim()
+  if (!resolved) {
+    const error = new Error('KIE_KEY_REQUIRED')
+    error.code = 'KIE_KEY_REQUIRED'
+    throw error
+  }
+  return resolved
+}
+
 function checkEnv({ airtable = false, kie = true } = {}) {
+  // Airtable storage flows through Composio; Kie generation uses each signed-in
+  // account's own Kie key from the App Auth table, so the only server-side
+  // requirement is that the Composio credential exists (and the airtable
+  // toolkit is connected when storage is checked).
   const missing = []
-  if (kie && !kieKey()) missing.push('KIE_API_KEY')
-  if (airtable && !hasAirtableCredential()) missing.push('AIRTABLE_AUTH')
+  if (!composio.hasComposio()) missing.push('COMPOSIO_API_KEY')
   if (!missing.length) return null
   return json(500, {
     error: `Missing environment variable${missing.length > 1 ? 's' : ''}: ${missing.join(', ')}.`,
@@ -65,7 +83,7 @@ function denied() {
 async function uploadBase64(dataUrl, fileName, key) {
   const res = await fetch(UPLOAD_URL, {
     method: 'POST',
-    headers: authHeaders(key),
+    headers: authHeaders(requireKieKey(key)),
     body: JSON.stringify({
       base64Data: dataUrl,
       uploadPath: 'content-factory',
@@ -101,7 +119,7 @@ async function toHostedUrl(media, i, key) {
   if (typeof media !== 'string' || !media) throw new Error('Invalid media')
   if (media.startsWith('http')) return media
   const ext = mediaExtension(media)
-  return uploadBase64(media, `cf-${i}-${Date.now()}.${ext}`, key)
+  return uploadBase64(media, `higgsfield-${i}-${Date.now()}.${ext}`, key)
 }
 
 async function createTask(modelId, input, callBackUrl, key) {
@@ -109,7 +127,7 @@ async function createTask(modelId, input, callBackUrl, key) {
   if (callBackUrl) payload.callBackUrl = callBackUrl
   const res = await fetch(`${JOBS_BASE}/createTask`, {
     method: 'POST',
-    headers: authHeaders(key),
+    headers: authHeaders(requireKieKey(key)),
     body: JSON.stringify(payload),
   })
   const raw = await res.text()
@@ -125,7 +143,7 @@ async function createTask(modelId, input, callBackUrl, key) {
 async function getTask(taskId, key) {
   const url = new URL(`${JOBS_BASE}/recordInfo`)
   url.searchParams.set('taskId', taskId)
-  const res = await fetch(url, { headers: authHeaders(key) })
+  const res = await fetch(url, { headers: authHeaders(requireKieKey(key)) })
   const data = await res.json().catch(() => ({}))
   const record = data.data || {}
   let urls = []
@@ -140,6 +158,6 @@ async function getTask(taskId, key) {
 }
 
 module.exports = {
-  json, denied, models, byId, authHeaders, checkEnv, guard,
+  json, denied, models, byId, authHeaders, checkEnv, guard, requireKieKey,
   createTask, getTask, toHostedUrl, uploadBase64, kieKey,
 }

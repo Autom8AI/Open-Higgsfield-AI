@@ -135,34 +135,25 @@ function safeEqual(a, b) {
 }
 
 function authToken() {
-  return (
+  // Kept for compatibility — auth now flows through Composio.
+  return String(
     process.env.AIRTABLE_AUTH ||
     process.env.AIRTABLE_PAT ||
     process.env.AIRTABLE_API_KEY ||
     ''
-  )
+  ).trim()
 }
 
 async function airtableRequest(baseId, path, options = {}) {
-  const token = authToken()
-  if (!token) {
-    const error = new Error('Airtable credentials are not configured (AIRTABLE_AUTH).')
-    error.code = 'AIRTABLE_UNAVAILABLE'
-    throw error
-  }
+  const { toolkitFetch } = require('./_composio')
 
-  const response = await fetch(`https://api.airtable.com/v0/${baseId}/${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
+  const response = await toolkitFetch('airtable', `https://api.airtable.com/v0/${baseId}/${path}`, {
+    method: options.method || 'GET',
+    body: options.body,
   })
 
-  const text = await response.text()
   let body = {}
-  try { body = text ? JSON.parse(text) : {} } catch {}
+  try { body = response.text ? JSON.parse(response.text) : {} } catch { body = {} }
 
   if (!response.ok) {
     const rawError = body?.error

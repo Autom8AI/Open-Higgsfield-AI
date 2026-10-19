@@ -1,6 +1,8 @@
-// Airtable storage — DIRECT PAT calls, hardcoded IDs mirroring motivquotez.
-// Champion Auto Spa media base appSYUhlcApc5k3PO, no Composio, no env indirection
-// for base/table (hardcoded like motivquotez's PRIMARY_BASE_ID / TABLE_ID).
+// Airtable storage — every call is forwarded through Composio's proxy-execute
+// with the ACTIVE airtable connected account (the single COMPOSIO_API_KEY
+// server secret). Champion Auto Spa media base appSYUhlcApc5k3PO; base/table
+// IDs stay hardcoded.
+const { toolkitFetch } = require('./_composio')
 
 const BASE_ID = 'appSYUhlcApc5k3PO' // Champion Auto Spa — hardcoded
 const GENERATIONS = 'tbleSsBerfkEtTFTk' // Generations — hardcoded
@@ -20,6 +22,7 @@ function normalizeToken(raw) {
   return token
 }
 
+// Kept exported for compatibility; Airtable auth now lives inside Composio.
 const auth = () => normalizeToken(
   process.env.AIRTABLE_AUTH
     || process.env.AIRTABLE_API_KEY
@@ -28,7 +31,6 @@ const auth = () => normalizeToken(
 )
 
 const headers = () => ({
-  Authorization: `Bearer ${auth()}`,
   'Content-Type': 'application/json',
 })
 
@@ -36,12 +38,11 @@ const api = (table, suffix = '') =>
   `https://api.airtable.com/v0/${BASE_ID}/${table}${suffix}`
 
 async function airtableFetch(url, options = {}) {
-  if (!auth()) throw new Error('Airtable credentials are not configured (AIRTABLE_AUTH).')
-  const res = await fetch(url, {
-    ...options,
-    headers: { ...headers(), ...(options.headers || {}) },
+  const res = await toolkitFetch('airtable', url, {
+    method: options.method || 'GET',
+    body: options.body,
   })
-  const body = await res.json().catch(() => ({}))
+  const body = res.json ? res.json() : {}
   if (!res.ok) {
     const rawError = body?.error
     const message = typeof rawError === 'string'

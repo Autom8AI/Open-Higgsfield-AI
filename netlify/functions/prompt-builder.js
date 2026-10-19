@@ -1,5 +1,6 @@
 // Converts a plain-language request into a production-ready image/video prompt.
 const { json, denied, authHeaders, checkEnv, guard } = require('./_kie')
+const { requireAccount, accountProviderKeys } = require('./_auth')
 
 const CHAT_URL = 'https://api.kie.ai/gpt-5-2/v1/chat/completions'
 
@@ -7,8 +8,10 @@ exports.handler = guard('prompt-builder', async function (event) {
   if (event.httpMethod === 'OPTIONS') return json(200, { ok: true })
   const no = denied(event)
   if (no) return no
-  const env = checkEnv()
-  if (env) return env
+  const auth = await requireAccount(event, { requireProviderSetup: false })
+  if (auth.error) return json(auth.error.statusCode, auth.error.body)
+  const kieKey = accountProviderKeys(auth.account).kie
+  if (!kieKey) return json(403, { error: 'KIE_KEY_REQUIRED' })
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed.' })
 
   let body = {}
@@ -40,7 +43,7 @@ Rules:
 
   const res = await fetch(CHAT_URL, {
     method: 'POST',
-    headers: authHeaders(),
+    headers: authHeaders(kieKey),
     body: JSON.stringify({
       messages: [
         { role: 'system', content: [{ type: 'text', text: system }] },

@@ -4,7 +4,8 @@
 //   2. once the browser sees that audio is ready, call this endpoint again with
 //      the voice task/audio URL to create the final talking-video task.
 // This keeps the Netlify function short and avoids the previous hard-coded 504.
-const { json, denied, byId, createTask, getTask, toHostedUrl, checkEnv, guard } = require('./_kie')
+const { json, denied, byId, createTask, getTask, toHostedUrl, checkEnv, guard, requireKieKey } = require('./_kie')
+const { requireAccount, accountProviderKeys } = require('./_auth')
 const { GENERATIONS, createRecord } = require('./_airtable')
 
 // No kie.ai model has a motion parameter -- all 128 were checked. On five of
@@ -26,9 +27,13 @@ exports.handler = guard('talk', async function (event) {
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' })
   const gate = denied(event); if (gate) return gate
 
-  // Generation requires Kie only. Airtable is permanent storage and must not
-  // block a valid talking-video task, matching the image/video create endpoint.
-  const env = checkEnv({ airtable: false }); if (env) return env
+  // Generation requires the signed-in account's own Kie key. Airtable is
+  // permanent storage and must not block a valid talking-video task.
+  const auth = await requireAccount(event, { requireProviderSetup: false })
+  if (auth.error) return json(auth.error.statusCode, auth.error.body)
+  const kieKey = accountProviderKeys(auth.account).kie
+  if (!kieKey) return json(403, { error: 'KIE_KEY_REQUIRED' })
+  if (checkEnv) { /* composio-only precondition (no-op unless misconfigured) */ }
 
   const b = JSON.parse(event.body || '{}')
   const { text, portrait, voice, modelId = 'kling/ai-avatar-standard' } = b
@@ -57,7 +62,8 @@ exports.handler = guard('talk', async function (event) {
   // First request: only enqueue ElevenLabs. Do not hold the serverless request
   // open while Kie generates audio.
   if (!ttsId && !audio) {
-    ttsId = await createTask(ttsModel, ttsInput)
+    requireKieKey(kieKey)
+    ttsId = await createTask(ttsModel, ttsInput, undefined, kieKey)
     return json(202, {
       ok: true,
       pending: true,
@@ -75,7 +81,7 @@ exports.handler = guard('talk', async function (event) {
   // Resume request without a supplied audio URL: check the existing voice task
   // exactly once and return 202 while it is still running.
   if (!audio) {
-    const voiceTask = await getTask(ttsId)
+    const voiceTask = await getTask(ttsId, kieKey)
     if (failedState(voiceTask.state)) {
       return json(502, { error: `Voice generation failed: ${voiceTask.error || 'Unknown error'}`, ttsId })
     }
@@ -97,7 +103,7 @@ exports.handler = guard('talk', async function (event) {
   }
 
   // Step 2 -- portrait + completed audio -> video, on a callback.
-  const portraitUrl = await toHostedUrl(portrait, 0)
+  const portraitUrl = await toHostedUrl(portrait, 0, kieKey)
   const input = {
     [model.portrait]: portraitUrl,
     [model.audio]: audio,
@@ -111,7 +117,7 @@ exports.handler = guard('talk', async function (event) {
 
   const base = process.env.URL || process.env.DEPLOY_PRIME_URL
   const cb = base ? `${base}/.netlify/functions/callback` : undefined
-  const taskId = await createTask(modelId, input, cb)
+  const taskId = await createTask(modelId, input, cb, kieKey)
 
   const meta = {
     ...input,

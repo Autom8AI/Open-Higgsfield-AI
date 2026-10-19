@@ -11,17 +11,8 @@
 // rejected AIRTABLE_AUTH value may still exist. The previously loaded client
 // always selected AIRTABLE_AUTH first, which made only this route repeatedly
 // send the stale token and return 401.
-const avatarAirtableToken =
-  process.env.AIRTABLE_ACCESS_TOKEN ||
-  process.env.AIRTABLE_PERSONAL_ACCESS_TOKEN ||
-  process.env.AIRTABLE_PAT ||
-  process.env.AIRTABLE_TOKEN ||
-  process.env.AIRTABLE_API_KEY ||
-  process.env.AIRTABLE_AUTH
-
-if (avatarAirtableToken) process.env.AIRTABLE_AUTH = avatarAirtableToken
-
 const { json, denied, toHostedUrl, checkEnv, guard } = require('./_kie')
+const { requireAccount, accountProviderKeys } = require('./_auth')
 const { listRecords, createRecord, updateRecord, deleteRecord } = require('./_airtable')
 
 // Use the verified table directly. A stale AIRTABLE_AVATARS_ID variable must not
@@ -95,10 +86,14 @@ exports.handler = guard('avatars', async function (event) {
       if (!src) return json(400, { error: 'No such source avatar.' })
       incoming = (src.fields.Portraits || []).map((a) => ({ url: a.url, filename: a.filename }))
     } else {
+        const auth = await requireAccount(event, { requireProviderSetup: false })
+        if (auth.error) return json(auth.error.statusCode, auth.error.body)
+        const kieKey = accountProviderKeys(auth.account).kie
+        if (!kieKey) return json(403, { error: 'KIE_KEY_REQUIRED' })
       const env = checkEnv({ airtable: false }); if (env) return env
       const hosted = []
       for (let i = 0; i < (b.images || []).length; i++) {
-        hosted.push(await toHostedUrl(b.images[i], i))
+        hosted.push(await toHostedUrl(b.images[i], i, kieKey))
       }
       incoming = hosted.map((url, i) => ({ url, filename: `portrait-${Date.now()}-${i}.png` }))
     }
@@ -133,10 +128,14 @@ exports.handler = guard('avatars', async function (event) {
   }
 
   if ((b.images || []).length) {
+    const auth = await requireAccount(event, { requireProviderSetup: false })
+    if (auth.error) return json(auth.error.statusCode, auth.error.body)
+    var createKieKey = accountProviderKeys(auth.account).kie
+    if (!createKieKey) return json(403, { error: 'KIE_KEY_REQUIRED' })
     const env = checkEnv({ airtable: false }); if (env) return env
   }
   for (let i = 0; i < (b.images || []).length; i++) {
-    const url = await toHostedUrl(b.images[i], i)
+    const url = await toHostedUrl(b.images[i], i, createKieKey)
     portraits.push({ url, filename: `portrait-${Date.now()}-${i}.png` })
   }
   if (!portraits.length) return json(400, { error: 'At least one reference portrait.' })

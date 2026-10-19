@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 @theme {
-    --color-primary: #d9ff00;
-    --color-primary-hover: #c4e600;
+    --color-primary: #ff2d2d;
+    --color-primary-hover: #e11d1d;
     --color-app-bg: #050505;
     --color-panel-bg: #0a0a0a;
     --color-card-bg: #141414;
@@ -15,7 +15,7 @@
     --radius-2xl: 1.5rem;
     --radius-3xl: 2rem;
 
-    --shadow-glow: 0 0 20px rgba(217, 255, 0, 0.4);
+    --shadow-glow: 0 0 20px rgba(255, 45, 45, 0.4);
     --shadow-glow-accent: 0 0 20px rgba(168, 85, 247, 0.4);
     --shadow-3xl: 0 35px 60px -15px rgba(0, 0, 0, 0.8);
 }

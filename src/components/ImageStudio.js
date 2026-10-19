@@ -674,7 +674,7 @@ export function ImageStudio() {
                                 <span class="text-xs font-bold text-white tracking-tight">${m.name}</span>
                              </div>
                         </div>
-                        ${selectedModel === m.id ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d9ff00" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+                        ${selectedModel === m.id ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff2d2d" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
                     `;
                     item.onclick = (e) => {
                         e.stopPropagation();
@@ -725,7 +725,7 @@ export function ImageStudio() {
                         </div>
                         <span class="text-xs font-bold text-white opacity-80 group-hover:opacity-100 transition-opacity">${r}</span>
                     </div>
-                     ${selectedAr === r ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d9ff00" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+                     ${selectedAr === r ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff2d2d" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
                 `;
                 item.onclick = (e) => {
                     e.stopPropagation();
@@ -749,7 +749,7 @@ export function ImageStudio() {
                 item.className = 'flex items-center justify-between p-3.5 hover:bg-white/5 rounded-2xl cursor-pointer transition-all group';
                 item.innerHTML = `
                     <span class="text-xs font-bold text-white opacity-80 group-hover:opacity-100">${opt}</span>
-                     ${document.getElementById('quality-btn-label').textContent === opt ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d9ff00" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+                     ${document.getElementById('quality-btn-label').textContent === opt ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff2d2d" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
                 `;
                 item.onclick = (e) => {
                     e.stopPropagation();

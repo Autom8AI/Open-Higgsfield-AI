@@ -128,7 +128,13 @@ exports.handler = guard('library', async function (event) {
 
     if (work.length) {
       await Promise.allSettled(work)
-      try { records = await listRecords(GENERATIONS, { sortField: 'Created', max: 100 }) } catch {}
+      try {
+        const refreshed = await listRecords(GENERATIONS, { sortField: 'Created', max: 100 })
+        // Keep the original set when the refresh came back empty (e.g. a
+        // throttled retry after the parallel sync burst) rather than showing
+        // an empty library.
+        if (Array.isArray(refreshed) && refreshed.length) records = refreshed
+      } catch {}
     }
   }
 

@@ -16,6 +16,10 @@ function navigate(page) {
     import('./components/VideoStudio.js').then(({ VideoStudio }) => {
       contentArea.appendChild(VideoStudio());
     });
+  } else if (page === 'library') {
+    import('./components/LibraryPage.js').then(({ LibraryPage }) => {
+      contentArea.appendChild(LibraryPage());
+    });
   } else if (page === 'cinema') {
     import('./components/CinemaStudio.js').then(({ CinemaStudio }) => {
       contentArea.appendChild(CinemaStudio());
@@ -37,7 +41,7 @@ contentArea.className = 'flex-1 relative w-full overflow-hidden flex flex-col bg
 app.appendChild(contentArea);
 
 // Initial Route
-navigate('image');
+navigate('library');
 
 // Event Listener for Navigation
 window.addEventListener('navigate', (e) => {

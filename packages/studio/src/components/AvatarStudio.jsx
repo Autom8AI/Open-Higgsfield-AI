@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { generateI2I, uploadFile } from "../muapi.js";
+import { generateI2I, uploadFile } from "../kie.js";
 import { getAspectRatiosForI2IModel, getResolutionsForI2IModel } from "../models.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────

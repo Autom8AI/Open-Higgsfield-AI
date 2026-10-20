@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { processLipSync, uploadFile } from '../muapi.js';
+import { processLipSync, uploadFile } from '../kie.js';
 import {
     lipsyncModels,
     imageLipSyncModels,

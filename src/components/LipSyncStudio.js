@@ -1,4 +1,4 @@
-import { muapi } from '../lib/muapi.js';
+import { kie } from '../lib/kie.js';
 import { lipsyncModels, imageLipSyncModels, videoLipSyncModels, getLipSyncModelById, getResolutionsForLipSyncModel } from '../lib/models.js';
 import { AuthModal } from './AuthModal.js';
 import { createUploadPicker } from './UploadPicker.js';
@@ -168,11 +168,12 @@ export function LipSyncStudio() {
     videoFileInput.onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        const apiKey = localStorage.getItem('muapi_key');
-        if (!apiKey) { AuthModal(() => videoFileInput.click()); return; }
+        const apiKey = localStorage.getItem('kie_key');
+        const cfLogged = !!localStorage.getItem('cf_backend');
+        if (!apiKey && !cfLogged) { AuthModal(() => videoFileInput.click()); return; }
         showVideoSpinner();
         try {
-            uploadedVideoUrl = await muapi.uploadFile(file);
+            uploadedVideoUrl = await kie.uploadFile(file);
             showVideoReady(file.name);
         } catch (err) { showVideoIcon(); alert(`Video upload failed: ${err.message}`); }
         videoFileInput.value = '';
@@ -236,11 +237,12 @@ export function LipSyncStudio() {
     audioFileInput.onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        const apiKey = localStorage.getItem('muapi_key');
-        if (!apiKey) { AuthModal(() => audioFileInput.click()); return; }
+        const apiKey = localStorage.getItem('kie_key');
+        const cfLogged = !!localStorage.getItem('cf_backend');
+        if (!apiKey && !cfLogged) { AuthModal(() => audioFileInput.click()); return; }
         showAudioSpinner();
         try {
-            uploadedAudioUrl = await muapi.uploadFile(file);
+            uploadedAudioUrl = await kie.uploadFile(file);
             showAudioReady(file.name);
         } catch (err) { showAudioIcon(); alert(`Audio upload failed: ${err.message}`); }
         audioFileInput.value = '';
@@ -587,8 +589,9 @@ export function LipSyncStudio() {
     (async () => {
         const pending = getPendingJobs('lipsync');
         if (!pending.length) return;
-        const apiKey = localStorage.getItem('muapi_key');
-        if (!apiKey) return;
+        const apiKey = localStorage.getItem('kie_key');
+        const cfLogged = !!localStorage.getItem('cf_backend');
+        if (!apiKey && !localStorage.getItem('cf_backend')) return;
         const banner = document.createElement('div');
         banner.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-[#111] border border-white/10 text-white text-sm px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3';
         banner.innerHTML = `<span class="animate-spin text-primary">◌</span> <span class="banner-text">Resuming ${pending.length} pending generation${pending.length > 1 ? 's' : ''}…</span>`;
@@ -598,7 +601,7 @@ export function LipSyncStudio() {
             const elapsedAttempts = Math.floor((Date.now() - job.submittedAt) / job.interval);
             const attemptsLeft = Math.max(1, job.maxAttempts - elapsedAttempts);
             try {
-                const result = await muapi.pollForResult(job.requestId, apiKey, attemptsLeft, job.interval);
+                const result = await kie.pollForResult(job.requestId, apiKey, attemptsLeft, job.interval);
                 const url = result.outputs?.[0] || result.url || result.output?.url;
                 if (url) addToHistory({ id: job.requestId, url, ...job.historyMeta, timestamp: new Date().toISOString() });
             } catch (e) { console.warn('[LipSyncStudio] Pending job failed:', job.requestId, e.message); }
@@ -667,8 +670,9 @@ export function LipSyncStudio() {
             return;
         }
 
-        const apiKey = localStorage.getItem('muapi_key');
-        if (!apiKey) { AuthModal(() => generateBtn.click()); return; }
+        const apiKey = localStorage.getItem('kie_key');
+        const cfLogged = !!localStorage.getItem('cf_backend');
+        if (!apiKey && !cfLogged) { AuthModal(() => generateBtn.click()); return; }
 
         hero.classList.add('opacity-0', 'scale-95', '-translate-y-10', 'pointer-events-none');
         generateBtn.disabled = true;
@@ -703,7 +707,7 @@ export function LipSyncStudio() {
 
             if (model?.hasSeed) lipsyncParams.seed = -1;
 
-            const res = await muapi.processLipSync(lipsyncParams);
+            const res = await kie.processLipSync(lipsyncParams);
             console.log('[LipSyncStudio] Response:', res);
 
             if (res && res.url) {

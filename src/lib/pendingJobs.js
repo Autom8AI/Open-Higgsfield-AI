@@ -1,4 +1,4 @@
-const PENDING_KEY = 'muapi_pending_jobs';
+const PENDING_KEY = 'kie_pending_jobs';
 
 export function savePendingJob(job) {
     try {

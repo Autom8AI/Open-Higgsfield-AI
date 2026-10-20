@@ -1,8 +1,8 @@
 :root {
   /* Brand Colors */
-  --color-primary: #d9ff00;
+  --color-primary: #ff2d2d;
   /* Neon Yellow-Green (Higgsfield Nano) */
-  --color-primary-hover: #c4e600;
+  --color-primary-hover: #e11d1d;
   --color-accent: #a855f7;
   /* Creative Purple */
   --color-accent-hover: #9333ea;
@@ -36,7 +36,7 @@
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-  --shadow-glow: 0 0 20px rgba(176, 251, 93, 0.4);
+  --shadow-glow: 0 0 20px rgba(255, 45, 45, 0.4);
   --shadow-glow-accent: 0 0 20px rgba(168, 85, 247, 0.4);
   --backdrop-blur: blur(20px);
 

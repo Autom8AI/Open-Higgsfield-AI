@@ -12,7 +12,7 @@ const TABS = [
   { id: 'avatar',  label: 'Avatar Studio' },
 ];
 
-const STORAGE_KEY = 'muapi_key';
+const STORAGE_KEY = 'kie_key';
 
 export default function StandaloneShell() {
   const [apiKey, setApiKey] = useState(null);

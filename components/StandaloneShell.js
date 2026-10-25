@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ImageStudio, VideoStudio, LipSyncStudio, CinemaStudio } from 'studio';
+import { ImageStudio, VideoStudio, LipSyncStudio, CinemaStudio, AvatarStudio } from 'studio';
 import ApiKeyModal from './ApiKeyModal';
 
 const TABS = [
@@ -9,6 +9,7 @@ const TABS = [
   { id: 'video',   label: 'Video Studio' },
   { id: 'lipsync', label: 'Lip Sync' },
   { id: 'cinema',  label: 'Cinema Studio' },
+  { id: 'avatar',  label: 'Avatar Studio' },
 ];
 
 const STORAGE_KEY = 'kie_key';
@@ -18,6 +19,12 @@ export default function StandaloneShell() {
   const [activeTab, setActiveTab] = useState('image');
   const [showSettings, setShowSettings] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
+  const [avatarHandoffUrl, setAvatarHandoffUrl] = useState(null);
+
+  const handleAnimateAvatar = useCallback((url) => {
+    setAvatarHandoffUrl(url);
+    setActiveTab('lipsync');
+  }, []);
 
   useEffect(() => {
     setHasMounted(true);
@@ -85,8 +92,15 @@ export default function StandaloneShell() {
       <div className="flex-1">
         {activeTab === 'image'   && <ImageStudio   apiKey={apiKey} />}
         {activeTab === 'video'   && <VideoStudio   apiKey={apiKey} />}
-        {activeTab === 'lipsync' && <LipSyncStudio apiKey={apiKey} />}
+        {activeTab === 'lipsync' && (
+          <LipSyncStudio
+            apiKey={apiKey}
+            initialImageUrl={avatarHandoffUrl}
+            onInitialImageConsumed={() => setAvatarHandoffUrl(null)}
+          />
+        )}
         {activeTab === 'cinema'  && <CinemaStudio  apiKey={apiKey} />}
+        {activeTab === 'avatar'  && <AvatarStudio  apiKey={apiKey} onAnimateAvatar={handleAnimateAvatar} />}
       </div>
 
       {/* Settings Modal */}

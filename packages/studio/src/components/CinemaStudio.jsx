@@ -551,7 +551,8 @@ export default function CinemaStudio({ apiKey, onGenerationComplete, historyItem
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(blobUrl);
-        } catch {
+        } catch (err) {
+            console.warn('[CinemaStudio] Direct download failed, falling back to window.open', err);
             window.open(canvasUrl, '_blank');
         }
     }, [canvasUrl]);

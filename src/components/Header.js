@@ -1,6 +1,7 @@
 
 
 import { BackendModal } from './BackendModal.js';
+import { logoutBackend } from '../lib/api.js';
 export function Header(navigate) {
     const header = document.createElement('header');
     header.className = 'w-full flex flex-col z-50 sticky top-0';
@@ -96,6 +97,20 @@ export function Header(navigate) {
 
     const rightPart = document.createElement('div');
     rightPart.className = 'flex items-center gap-4';
+
+    // Sign out — clears the session cookie server-side, then reloads so
+    // the sign-in gate in main.js takes over again.
+    const signOutBtn = document.createElement('button');
+    signOutBtn.textContent = 'Sign Out';
+    signOutBtn.className = 'text-[13px] font-bold text-secondary hover:text-white transition-colors cursor-pointer';
+    signOutBtn.title = 'Sign out';
+    signOutBtn.onclick = async () => {
+        signOutBtn.disabled = true;
+        signOutBtn.textContent = 'Signing out…';
+        try { await logoutBackend(); } catch { /* cookie may already be gone */ }
+        window.location.reload();
+    };
+    rightPart.appendChild(signOutBtn);
 
 
     // Mobile navigation (bottom bar on small screens)

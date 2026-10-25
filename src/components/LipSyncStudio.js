@@ -86,6 +86,15 @@ export function LipSyncStudio() {
     modeToggleRow.appendChild(videoModeBtn);
     bar.appendChild(modeToggleRow);
 
+    // The current model registry has no video-input lip-sync models
+    // (videoLipSyncModels is empty) — disable the Video mode toggle
+    // instead of letting it crash on an empty model list.
+    if (videoLipSyncModels.length === 0) {
+        videoModeBtn.disabled = true;
+        videoModeBtn.title = 'No video-input lip-sync models available yet';
+        videoModeBtn.classList.add('opacity-40', 'cursor-not-allowed');
+    }
+
     // --- Uploads Row ---
     const uploadsRow = document.createElement('div');
     uploadsRow.className = 'flex items-start gap-3 px-2';
@@ -422,6 +431,7 @@ export function LipSyncStudio() {
 
         // Switch to first model of new mode
         const models = getCurrentModels();
+        if (models.length === 0) return;
         selectedModel = models[0].id;
         document.getElementById('ls-model-btn-label').textContent = models[0].name;
 

@@ -521,6 +521,13 @@ export function getI2IModelById(id) { return i2iModels.find(m => m.id === id); }
 export function getI2VModelById(id) { return i2vModels.find(m => m.id === id); }
 export function getLipSyncModelById(id) { return lipsyncModels.find(m => m.id === id); }
 
+// Lip-sync models split by input type, used by LipSyncStudio's mode toggle.
+// The kie registry in data/models.json has no `category` field: talk models
+// take either a portrait image (`portrait` param) or a video (`video` param).
+// Currently every talk model is portrait-based, so the video list is empty.
+export const imageLipSyncModels = lipsyncModels.filter(m => m.portrait);
+export const videoLipSyncModels = lipsyncModels.filter(m => m.video);
+
 export function getAspectRatiosForModel(modelId) {
   const m = getModelById(modelId);
   return m?.aspects || ['1:1'];

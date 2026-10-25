@@ -1,5 +1,6 @@
 
 
+import { BackendModal } from './BackendModal.js';
 export function Header(navigate) {
     const header = document.createElement('header');
     header.className = 'w-full flex flex-col z-50 sticky top-0';
@@ -70,11 +71,59 @@ export function Header(navigate) {
     });
 
     leftPart.appendChild(logoContainer);
+    
+    // Settings button for API key management
+    const settingsBtn = document.createElement('button');
+    settingsBtn.className = 'p-2 text-secondary hover:text-white transition-colors';
+    settingsBtn.title = 'Update API Key';
+    settingsBtn.innerHTML = `
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3m-3-3l-2.25-2.25"/>
+        </svg>
+    `;
+    settingsBtn.onclick = () => {
+        // Toggle BackendModal for settings (no navigation)
+        const existing = document.querySelector('.backend-modal-overlay');
+        if (existing) {
+            existing.remove();
+        } else {
+            const m = BackendModal(); m.classList.add('backend-modal-overlay'); document.body.appendChild(m);
+        }
+    };
+    
+    leftPart.appendChild(settingsBtn);
     leftPart.appendChild(menu);
 
     const rightPart = document.createElement('div');
     rightPart.className = 'flex items-center gap-4';
 
+
+    // Mobile navigation (bottom bar on small screens)
+    const mobileNav = document.createElement("div");
+    mobileNav.className = "lg:hidden w-full h-16 bg-black border-t border-white/5 flex items-center justify-around px-2";
+    
+    items.forEach(name => {
+        const mLink = document.createElement("button");
+        mLink.textContent = name;
+        mLink.className = `flex-1 text-[11px] font-bold text-secondary hover:text-white transition-colors py-4 px-1 border-b-2 border-transparent hover:border-primary ${name === "Library" ? "text-white border-primary" : ""}`;
+        mLink.onclick = () => {
+            document.querySelectorAll(".mobile-nav-btn").forEach(btn => {
+                btn.classList.remove("text-white", "border-primary");
+                btn.classList.add("text-secondary", "border-transparent");
+            });
+            mLink.classList.add("text-white", "border-primary");
+            mLink.classList.remove("text-secondary", "border-transparent");
+            navigate(pageForItem[name]);
+        };
+        mLink.classList.add("mobile-nav-btn");
+        if (name === "Library") {
+            mLink.classList.add("text-white", "border-primary");
+            mLink.classList.remove("text-secondary", "border-transparent");
+        }
+        mobileNav.appendChild(mLink);
+    });
+    
+    header.appendChild(mobileNav);
     navBar.appendChild(leftPart);
     navBar.appendChild(rightPart);
 

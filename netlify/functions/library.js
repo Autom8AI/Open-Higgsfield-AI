@@ -156,6 +156,7 @@ exports.handler = guard('library', async function (event) {
       id: record.id,
       kind: (fields.Type || 'Image').toLowerCase() === 'video' ? 'videos' : 'images',
       model: fields.Model || '',
+      Folder: String(fields.Folder || "").trim(),
       prompt: fields.Prompt || '',
       status: fields.Status || '',
       state,

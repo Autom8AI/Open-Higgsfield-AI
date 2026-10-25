@@ -1,4 +1,4 @@
-// MATAI Library — every generated asset from the content-factory backend.
+// MATAI Library - every generated asset from the content-factory backend.
 // All media types in one place (images, videos, talking avatars), sorted with
 // the newest first. Requires a backend session; prompts sign-in otherwise.
 import { cfBackendEnabled, listLibrary } from '../lib/api.js';
@@ -124,7 +124,7 @@ export function LibraryPage() {
         if (!items.length) {
             grid.innerHTML = `<div class="col-span-full flex flex-col items-center justify-center py-24 gap-3 text-center">
                 <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-muted)" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-                <p class="text-sm text-secondary">${state.filter === 'all' ? 'Nothing generated yet — your creations land here.' : `No ${state.filter} yet.`}</p>
+                <p class="text-sm text-secondary">${state.filter === 'all' ? 'Nothing generated yet - your creations land here.' : `No ${state.filter} yet.`}</p>
             </div>`;
         } else {
             items.forEach(item => grid.appendChild(card(item)));

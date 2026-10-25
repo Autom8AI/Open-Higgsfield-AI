@@ -515,6 +515,12 @@ export const lipsyncModels = [
   }
 ];
 
+// LipSyncStudio offers two input modes, and each model accepts one kind of visual input:
+// a portrait image or an existing video. Derived from lipsyncModels so that regenerating
+// models.js from data/models.json keeps both lists in step.
+export const imageLipSyncModels = lipsyncModels.filter(m => m.portrait && !m.video);
+export const videoLipSyncModels = lipsyncModels.filter(m => m.video);
+
 export function getModelById(id) { return [t2iModels, i2iModels].flat().find(m => m.id === id); }
 export function getVideoModelById(id) { return [t2vModels, i2vModels, v2vModels].flat().find(m => m.id === id); }
 export function getI2IModelById(id) { return i2iModels.find(m => m.id === id); }

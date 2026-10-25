@@ -11,10 +11,13 @@ export function VideoStudio() {
     // --- State ---
     const defaultModel = t2vModels[0];
     let selectedModel = defaultModel.id;
-    let selectedModelName = defaultModel.name;
-    let selectedAr = defaultModel.inputs?.aspect_ratio?.default || '16:9';
-    let selectedDuration = defaultModel.inputs?.duration?.default || 5;
-    let selectedResolution = defaultModel.inputs?.resolution?.default || '';
+    let selectedModelName = defaultModel.label;
+    // The data lists the aspect ratios a model supports but names no default, and their order is
+    // arbitrary, so keep the studio's own default whenever the model supports it.
+    let selectedAr = defaultModel.aspects?.includes('16:9') ? '16:9' : (defaultModel.aspects?.[0] || '16:9');
+    // The model data carries only hasDuration, no per-model duration default, so this is the fallback.
+    let selectedDuration = 5;
+    let selectedResolution = defaultModel.resolutionDefault || '';
     let selectedQuality = defaultModel.inputs?.quality?.default || '';
     let selectedMode = '';
     let lastGenerationId = null;
@@ -31,6 +34,9 @@ export function VideoStudio() {
     const getCurrentResolutions = (id) => imageMode ? getResolutionsForI2VModel(id) : getResolutionsForVideoModel(id);
     const getCurrentModes = (id) => getModesForModel(id);
     const getCurrentModel = () => getCurrentModels().find(m => m.id === selectedModel);
+    // No model in the current data defines a quality enum or a mode list, so the quality and mode
+    // controls stay hidden. These reads are left pointing at the richer `inputs` shape they were
+    // written for; restoring it in data/models.json brings both controls back.
     const getQualitiesForModel = (id) => {
         const model = getCurrentModels().find(m => m.id === id);
         return model?.inputs?.quality?.enum || [];
@@ -88,9 +94,10 @@ export function VideoStudio() {
                 showVideoIcon();
             }
             if (!imageMode) {
+                if (i2vModels.length === 0) return;
                 imageMode = true;
                 selectedModel = i2vModels[0].id;
-                selectedModelName = i2vModels[0].name;
+                selectedModelName = i2vModels[0].label;
                 document.getElementById('v-model-btn-label').textContent = selectedModelName;
                 updateControlsForModel(selectedModel);
             }
@@ -101,13 +108,20 @@ export function VideoStudio() {
             uploadedImageUrl = null;
             imageMode = false;
             selectedModel = t2vModels[0].id;
-            selectedModelName = t2vModels[0].name;
+            selectedModelName = t2vModels[0].label;
             document.getElementById('v-model-btn-label').textContent = selectedModelName;
             updateControlsForModel(selectedModel);
             textarea.placeholder = 'Describe the video you want to create';
             textarea.disabled = false;
         }
     });
+    // No image-to-video models are defined, so an uploaded image has nothing to generate with.
+    if (i2vModels.length === 0) {
+        picker.trigger.disabled = true;
+        picker.trigger.title = 'No image-to-video models are available';
+        picker.trigger.className += ' opacity-40 cursor-not-allowed';
+    }
+
     topRow.appendChild(picker.trigger);
     container.appendChild(picker.panel);
 
@@ -121,6 +135,13 @@ export function VideoStudio() {
     videoPickerBtn.type = 'button';
     videoPickerBtn.title = 'Upload video to remove watermark';
     videoPickerBtn.className = 'w-10 h-10 shrink-0 rounded-xl border transition-all flex items-center justify-center relative overflow-hidden mt-1.5 bg-white/5 border-white/10 hover:bg-white/10 hover:border-primary/40 group';
+
+    // No video-to-video models are defined, so an uploaded video has nothing to generate with.
+    if (v2vModels.length === 0) {
+        videoPickerBtn.disabled = true;
+        videoPickerBtn.title = 'No video-to-video models are available';
+        videoPickerBtn.className += ' opacity-40 cursor-not-allowed';
+    }
 
     const videoIconEl = document.createElement('div');
     videoIconEl.className = 'flex items-center justify-center w-full h-full';
@@ -168,7 +189,7 @@ export function VideoStudio() {
         v2vMode = false;
         showVideoIcon();
         selectedModel = t2vModels[0].id;
-        selectedModelName = t2vModels[0].name;
+        selectedModelName = t2vModels[0].label;
         document.getElementById('v-model-btn-label').textContent = selectedModelName;
         updateControlsForModel(selectedModel);
         textarea.placeholder = 'Describe the video you want to create';
@@ -207,9 +228,10 @@ export function VideoStudio() {
                 uploadedImageUrl = null;
                 imageMode = false;
             }
+            if (v2vModels.length === 0) return;
             v2vMode = true;
             selectedModel = v2vModels[0].id;
-            selectedModelName = v2vModels[0].name;
+            selectedModelName = v2vModels[0].label;
             document.getElementById('v-model-btn-label').textContent = selectedModelName;
             updateControlsForModel(selectedModel);
             textarea.placeholder = 'Video ready — click Generate to remove watermark';
@@ -434,9 +456,9 @@ export function VideoStudio() {
                 const iconColor = isV2V ? 'bg-orange-500/10 text-orange-400' : m.id.includes('kling') ? 'bg-blue-500/10 text-blue-400' : m.id.includes('veo') ? 'bg-purple-500/10 text-purple-400' : m.id.includes('sora') ? 'bg-rose-500/10 text-rose-400' : 'bg-primary/10 text-primary';
                 item.innerHTML = `
                     <div class="flex items-center gap-3.5">
-                         <div class="w-10 h-10 ${iconColor} border border-white/5 rounded-xl flex items-center justify-center font-black text-sm shadow-inner uppercase">${m.name.charAt(0)}</div>
+                         <div class="w-10 h-10 ${iconColor} border border-white/5 rounded-xl flex items-center justify-center font-black text-sm shadow-inner uppercase">${m.label.charAt(0)}</div>
                          <div class="flex flex-col gap-0.5">
-                            <span class="text-xs font-bold text-white tracking-tight">${m.name}</span>
+                            <span class="text-xs font-bold text-white tracking-tight">${m.label}</span>
                             ${isV2V ? '<span class="text-[9px] text-orange-400/70">Upload a video to use</span>' : ''}
                          </div>
                     </div>
@@ -451,7 +473,7 @@ export function VideoStudio() {
                         picker.reset();
                         uploadedImageUrl = null;
                         selectedModel = m.id;
-                        selectedModelName = m.name;
+                        selectedModelName = m.label;
                         document.getElementById('v-model-btn-label').textContent = selectedModelName;
                         updateControlsForModel(selectedModel);
                         textarea.placeholder = 'Upload a video using the 🎥 button, then click Generate';
@@ -465,7 +487,7 @@ export function VideoStudio() {
                             textarea.disabled = false;
                         }
                         selectedModel = m.id;
-                        selectedModelName = m.name;
+                        selectedModelName = m.label;
                         document.getElementById('v-model-btn-label').textContent = selectedModelName;
                         updateControlsForModel(selectedModel);
                         textarea.placeholder = imageMode ? 'Describe the motion or effect (optional)' : 'Describe the video you want to create';
@@ -482,11 +504,11 @@ export function VideoStudio() {
                 // Regular generation models (always t2v or i2v, never v2v)
                 const generationModels = imageMode ? i2vModels : t2vModels;
                 const filteredMain = generationModels
-                    .filter(m => m.name.toLowerCase().includes(lf) || m.id.toLowerCase().includes(lf));
+                    .filter(m => m.label.toLowerCase().includes(lf) || m.id.toLowerCase().includes(lf));
                 filteredMain.forEach(m => list.appendChild(makeModelItem(m, false)));
 
                 // Video Tools section
-                const filteredV2V = v2vModels.filter(m => m.name.toLowerCase().includes(lf) || m.id.toLowerCase().includes(lf));
+                const filteredV2V = v2vModels.filter(m => m.label.toLowerCase().includes(lf) || m.id.toLowerCase().includes(lf));
                 if (filteredV2V.length > 0) {
                     const sectionLabel = document.createElement('div');
                     sectionLabel.className = 'text-[10px] font-bold text-orange-400/70 uppercase tracking-widest px-3 py-2 mt-1 border-t border-white/5';
@@ -882,7 +904,7 @@ export function VideoStudio() {
         v2vMode = false;
         showVideoIcon();
         selectedModel = t2vModels[0].id;
-        selectedModelName = t2vModels[0].name;
+        selectedModelName = t2vModels[0].label;
         document.getElementById('v-model-btn-label').textContent = selectedModelName;
         updateControlsForModel(selectedModel);
         textarea.placeholder = 'Describe the video you want to create';

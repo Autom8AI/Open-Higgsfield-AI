@@ -57,5 +57,8 @@
     "tailwindcss": "^3.4.19",
     "tailwindcss-v4": "npm:tailwindcss@^4.1.18",
     "vite": "^5.4.0"
+  },
+  "allowScripts": {
+    "sharp@0.34.5": true
   }
 }

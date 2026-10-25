@@ -1,4 +1,6 @@
-@import "tailwindcss";
+/* Tailwind v4, under an alias: the root `tailwindcss` is v3 for the Next.js entry
+   (app/globals.css + postcss.config.js). See package.json devDependencies. */
+@import "tailwindcss-v4";
 
 @theme {
     --color-primary: #ff2d2d;

@@ -27,8 +27,10 @@ export function ImageStudio() {
     // --- State ---
     const defaultModel = t2iModels[0];
     let selectedModel = defaultModel.id;
-    let selectedModelName = defaultModel.name;
-    let selectedAr = defaultModel.inputs?.aspect_ratio?.default || '1:1';
+    let selectedModelName = defaultModel.label;
+    // The data lists the aspect ratios a model supports but names no default, and their order is
+    // arbitrary, so keep the studio's own default whenever the model supports it.
+    let selectedAr = defaultModel.aspects?.includes('1:1') ? '1:1' : (defaultModel.aspects?.[0] || '1:1');
     let dropdownOpen = null;
     let uploadedImageUrls = []; // array of uploaded image URLs (multi-image support)
     let imageMode = false; // false = t2i models, true = i2i models
@@ -107,7 +109,7 @@ export function ImageStudio() {
             if (!imageMode) {
                 imageMode = true;
                 selectedModel = i2iModels[0].id;
-                selectedModelName = i2iModels[0].name;
+                selectedModelName = i2iModels[0].label;
                 selectedAr = getAspectRatiosForI2IModel(selectedModel)[0];
                 document.getElementById('model-btn-label').textContent = selectedModelName;
                 document.getElementById('ar-btn-label').textContent = selectedAr;
@@ -124,7 +126,7 @@ export function ImageStudio() {
             uploadedImageUrls = [];
             imageMode = false;
             selectedModel = t2iModels[0].id;
-            selectedModelName = t2iModels[0].name;
+            selectedModelName = t2iModels[0].label;
             selectedAr = getAspectRatiosForModel(selectedModel)[0];
             document.getElementById('model-btn-label').textContent = selectedModelName;
             document.getElementById('ar-btn-label').textContent = selectedAr;
@@ -662,16 +664,16 @@ export function ImageStudio() {
 
             const renderModels = (filter = '') => {
                 list.innerHTML = '';
-                const filtered = getCurrentModels().filter(m => m.name.toLowerCase().includes(filter.toLowerCase()) || m.id.toLowerCase().includes(filter.toLowerCase()));
+                const filtered = getCurrentModels().filter(m => m.label.toLowerCase().includes(filter.toLowerCase()) || m.id.toLowerCase().includes(filter.toLowerCase()));
 
                 filtered.forEach(m => {
                     const item = document.createElement('div');
                     item.className = `flex items-center justify-between p-3.5 hover:bg-white/5 rounded-2xl cursor-pointer transition-all border border-transparent hover:border-white/5 ${selectedModel === m.id ? 'bg-white/5 border-white/5' : ''}`;
                     item.innerHTML = `
                         <div class="flex items-center gap-3.5">
-                             <div class="w-10 h-10 ${m.family === 'kontext' ? 'bg-blue-500/10 text-blue-400' : m.family === 'effects' ? 'bg-purple-500/10 text-purple-400' : 'bg-primary/10 text-primary'} border border-white/5 rounded-xl flex items-center justify-center font-black text-sm shadow-inner uppercase">${m.name.charAt(0)}</div>
+                             <div class="w-10 h-10 ${m.family === 'kontext' ? 'bg-blue-500/10 text-blue-400' : m.family === 'effects' ? 'bg-purple-500/10 text-purple-400' : 'bg-primary/10 text-primary'} border border-white/5 rounded-xl flex items-center justify-center font-black text-sm shadow-inner uppercase">${m.label.charAt(0)}</div>
                              <div class="flex flex-col gap-0.5">
-                                <span class="text-xs font-bold text-white tracking-tight">${m.name}</span>
+                                <span class="text-xs font-bold text-white tracking-tight">${m.label}</span>
                              </div>
                         </div>
                         ${selectedModel === m.id ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff2d2d" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
@@ -679,7 +681,7 @@ export function ImageStudio() {
                     item.onclick = (e) => {
                         e.stopPropagation();
                         selectedModel = m.id;
-                        selectedModelName = m.name;
+                        selectedModelName = m.label;
                         const availableArs = getCurrentAspectRatios(selectedModel);
                         selectedAr = availableArs[0];
                         document.getElementById('model-btn-label').textContent = selectedModelName;
@@ -1029,7 +1031,7 @@ export function ImageStudio() {
         // Reset to t2i mode
         imageMode = false;
         selectedModel = t2iModels[0].id;
-        selectedModelName = t2iModels[0].name;
+        selectedModelName = t2iModels[0].label;
         selectedAr = getAspectRatiosForModel(selectedModel)[0];
         document.getElementById('model-btn-label').textContent = selectedModelName;
         document.getElementById('ar-btn-label').textContent = selectedAr;

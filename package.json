@@ -38,23 +38,27 @@
     }
   },
   "dependencies": {
+    "axios": "^1.7.0",
     "next": "^15.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "studio": "*",
-    "axios": "^1.7.0",
-    "react-hot-toast": "^2.4.1"
+    "react-hot-toast": "^2.4.1",
+    "studio": "*"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@tailwindcss/vite": "^4.1.18",
     "autoprefixer": "^10.4.24",
     "electron": "^33.4.11",
     "electron-builder": "^25.1.8",
     "eslint": "^9",
     "eslint-config-next": "^15.0.0",
     "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.18",
-    "vite": "^5.4.0",
-    "@tailwindcss/vite": "^4.1.18"
+    "tailwindcss": "^3.4.19",
+    "tailwindcss-v4": "npm:tailwindcss@^4.1.18",
+    "vite": "^5.4.0"
+  },
+  "allowScripts": {
+    "sharp@0.34.5": true
   }
 }

@@ -13,7 +13,7 @@ export function LipSyncStudio() {
     // 'video' mode: existing video + audio → lipsync video
     let inputMode = 'image';
     let selectedModel = imageLipSyncModels[0].id;
-    let selectedResolution = imageLipSyncModels[0].inputs?.resolution?.default || '480p';
+    let selectedResolution = imageLipSyncModels[0].resolutionDefault || '480p';
     let uploadedImageUrl = null;
     let uploadedVideoUrl = null;
     let uploadedAudioUrl = null;
@@ -21,6 +21,20 @@ export function LipSyncStudio() {
 
     const getCurrentModels = () => inputMode === 'image' ? imageLipSyncModels : videoLipSyncModels;
     const getCurrentModel = () => lipsyncModels.find(m => m.id === selectedModel);
+
+    // The model data records only whether a prompt is required (promptRequired); it has no
+    // separate flag for models that merely accept an optional one, so a required prompt is
+    // the only case where the prompt box is shown and the prompt is sent.
+    const modelTakesPrompt = (model) => !!model?.promptRequired;
+
+    // Show the prompt box only for models that take a prompt, and say that it is required.
+    const applyPromptVisibility = (model) => {
+        const takesPrompt = modelTakesPrompt(model);
+        textarea.style.display = takesPrompt ? '' : 'none';
+        textarea.placeholder = takesPrompt
+            ? 'Describe the talking style or motion (required for this model)'
+            : 'Optional: describe the talking style or motion...';
+    };
 
     // ==========================================
     // 1. HERO SECTION
@@ -80,6 +94,13 @@ export function LipSyncStudio() {
     videoModeBtn.type = 'button';
     videoModeBtn.className = 'px-4 py-1.5 rounded-xl text-xs font-bold transition-all border border-white/10 text-muted hover:border-white/30 hover:text-white';
     videoModeBtn.textContent = '🎬 Video';
+
+    // No video-input lip-sync models are defined, so that mode has nothing to select.
+    if (videoLipSyncModels.length === 0) {
+        videoModeBtn.disabled = true;
+        videoModeBtn.title = 'No video-to-video lip-sync models are available';
+        videoModeBtn.className += ' opacity-40 cursor-not-allowed';
+    }
 
     modeToggleRow.appendChild(modeLabel);
     modeToggleRow.appendChild(imageModeBtn);
@@ -289,7 +310,7 @@ export function LipSyncStudio() {
     modelBtn.id = 'ls-model-btn';
     modelBtn.type = 'button';
     modelBtn.className = 'flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-primary/40 transition-all text-xs font-bold text-white group';
-    modelBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-primary"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg><span id="ls-model-btn-label">${getCurrentModels()[0].name}</span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="text-muted group-hover:text-white transition-colors"><polyline points="6 9 12 15 18 9"/></svg>`;
+    modelBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-primary"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg><span id="ls-model-btn-label">${getCurrentModels()[0].label}</span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="text-muted group-hover:text-white transition-colors"><polyline points="6 9 12 15 18 9"/></svg>`;
 
     // Resolution selector
     const resolutionBtn = document.createElement('button');
@@ -335,19 +356,19 @@ export function LipSyncStudio() {
                 const item = document.createElement('button');
                 item.type = 'button';
                 item.className = `w-full text-left px-4 py-2.5 rounded-xl text-sm transition-all hover:bg-white/10 ${m.id === selectedModel ? 'text-primary font-bold bg-primary/5' : 'text-white font-medium'}`;
-                item.innerHTML = `<div>${m.name}</div><div class="text-xs text-muted mt-0.5">${m.description?.slice(0, 60)}...</div>`;
+                item.innerHTML = `<div>${m.label}</div><div class="text-xs text-muted mt-0.5">${m.blurb?.slice(0, 60)}...</div>`;
                 item.onclick = () => {
                     selectedModel = m.id;
-                    document.getElementById('ls-model-btn-label').textContent = m.name;
+                    document.getElementById('ls-model-btn-label').textContent = m.label;
                     const resolutions = getResolutionsForLipSyncModel(selectedModel);
                     if (resolutions.length > 0) {
-                        selectedResolution = m.inputs?.resolution?.default || resolutions[0];
+                        selectedResolution = m.resolutionDefault || resolutions[0];
                         document.getElementById('ls-resolution-btn-label').textContent = selectedResolution;
                         resolutionBtn.classList.remove('hidden');
                     } else {
                         resolutionBtn.classList.add('hidden');
                     }
-                    textarea.style.display = m.hasPrompt ? '' : 'none';
+                    applyPromptVisibility(m);
                     closeDropdown();
                 };
                 dropdown.appendChild(item);
@@ -422,13 +443,14 @@ export function LipSyncStudio() {
 
         // Switch to first model of new mode
         const models = getCurrentModels();
+        if (models.length === 0) return;
         selectedModel = models[0].id;
-        document.getElementById('ls-model-btn-label').textContent = models[0].name;
+        document.getElementById('ls-model-btn-label').textContent = models[0].label;
 
         // Update resolution
         const resolutions = getResolutionsForLipSyncModel(selectedModel);
         if (resolutions.length > 0) {
-            selectedResolution = models[0].inputs?.resolution?.default || resolutions[0];
+            selectedResolution = models[0].resolutionDefault || resolutions[0];
             document.getElementById('ls-resolution-btn-label').textContent = selectedResolution;
             resolutionBtn.classList.remove('hidden');
         } else {
@@ -436,7 +458,7 @@ export function LipSyncStudio() {
         }
 
         // Show/hide prompt
-        textarea.style.display = models[0].hasPrompt ? '' : 'none';
+        applyPromptVisibility(models[0]);
     };
 
     imageModeBtn.onclick = () => {
@@ -448,7 +470,7 @@ export function LipSyncStudio() {
     };
 
     videoModeBtn.onclick = () => {
-        if (inputMode === 'video') return;
+        if (inputMode === 'video' || videoLipSyncModels.length === 0) return;
         inputMode = 'video';
         uploadedImageUrl = null;
         imagePicker.reset();
@@ -459,6 +481,9 @@ export function LipSyncStudio() {
     if (getResolutionsForLipSyncModel(selectedModel).length === 0) {
         resolutionBtn.classList.add('hidden');
     }
+
+    // Apply the same prompt rule to the model selected at startup, as switching mode does.
+    applyPromptVisibility(getCurrentModel());
 
     // ==========================================
     // 6. CANVAS AREA + HISTORY
@@ -670,6 +695,11 @@ export function LipSyncStudio() {
             return;
         }
 
+        if (modelTakesPrompt(model) && !prompt) {
+            alert('This model needs a prompt describing the talking style or motion.');
+            return;
+        }
+
         const apiKey = localStorage.getItem('kie_key');
         const cfLogged = !!localStorage.getItem('cf_backend');
         if (!apiKey && !cfLogged) { AuthModal(() => generateBtn.click()); return; }
@@ -700,7 +730,7 @@ export function LipSyncStudio() {
                 lipsyncParams.video_url = uploadedVideoUrl;
             }
 
-            if (prompt && model?.hasPrompt) lipsyncParams.prompt = prompt;
+            if (prompt && modelTakesPrompt(model)) lipsyncParams.prompt = prompt;
 
             const resolutions = getResolutionsForLipSyncModel(selectedModel);
             if (resolutions.length > 0) lipsyncParams.resolution = selectedResolution;

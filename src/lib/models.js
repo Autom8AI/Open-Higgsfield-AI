@@ -410,7 +410,11 @@ export const t2vModels = [
     "hasDuration": true
   }
 ];
-export const i2vModels = [];
+// Image-to-video: every registry video model that accepts image input
+// (the kie registry has no separate i2v list; Seedance/Kling/HappyHorse
+// take reference images via their `images` param).
+export const i2vModels = t2vModels.filter(m => m.images);
+// Video-to-video: no kie model accepts a source video yet.
 export const v2vModels = [];
 export const lipsyncModels = [
   {
@@ -592,4 +596,15 @@ export function getModesForModel(modelId) {
 export function getResolutionsForLipSyncModel(modelId) {
   const m = getLipSyncModelById(modelId);
   return m?.resolutions || [];
+}
+
+// --- Studio compatibility -------------------------------------------------
+// The registry entries use the kie schema (`label`, `blurb`), while the
+// studios were written against `name` / `description`. Normalize once here
+// so every list the studios consume carries both spellings.
+for (const list of [t2iModels, i2iModels, t2vModels, i2vModels, v2vModels, lipsyncModels]) {
+  for (const m of list) {
+    if (!m.name) m.name = m.label || m.id;
+    if (!m.description) m.description = m.blurb || '';
+  }
 }

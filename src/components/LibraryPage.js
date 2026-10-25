@@ -1,7 +1,7 @@
 // MATAI Library - every generated asset from the content-factory backend.
 // All media types in one place (images, videos, talking avatars), sorted with
 // the newest first. Requires a backend session; prompts sign-in otherwise.
-import { cfBackendEnabled, listLibrary } from '../lib/api.js';
+import { cfBackendEnabled, listLibrary, deleteLibraryItem } from '../lib/api.js';
 import { BackendModal } from './BackendModal.js';
 
 const state = { items: [], filter: 'all', error: '' };
@@ -59,8 +59,96 @@ function mediaBody(item) {
     </div>`;
 }
 
-function card(item) {
-    const openTarget = item.url || (item.state === 'success' ? item.sourceUrl : '') || '';
+function fileNameFor(item) {
+    const ext = groupOf(item) === 'videos' ? 'mp4' : 'png';
+    const base = String(item.model || 'matai-result').replace(/\W+/g, '-').replace(/^-+|-+$/g, '') || 'matai-result';
+    return `${base}-${String(item.id || '').slice(-6)}.${ext}`;
+}
+
+// Save a library item to the device. Streams through the /download-media
+// edge function (same-origin, Content-Disposition attachment). On mobile
+// browsers that support file sharing, the native share sheet is used so
+// the user can save straight to their camera roll / photos.
+async function saveToDevice(item, btn) {
+    const url = item.sourceUrl || item.url;
+    if (!url) return;
+    const name = fileNameFor(item);
+    const original = btn?.textContent;
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+    try {
+        const res = await fetch(`/download-media?url=${encodeURIComponent(url)}&name=${encodeURIComponent(name)}`);
+        if (!res.ok) throw new Error(`download failed (${res.status})`);
+        const blob = await res.blob();
+        const file = new File([blob], name, { type: blob.type || item.mime || 'application/octet-stream' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+                await navigator.share({ files: [file] });
+                return;
+            } catch (err) {
+                if (err && err.name === 'AbortError') return; // user dismissed the share sheet
+                // share failed for another reason — fall through to download
+            }
+        }
+        const objUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objUrl;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(objUrl), 4000);
+    } catch {
+        window.open(url, '_blank');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = original; }
+    }
+}
+
+// Full-screen preview HUD: big preview, prompt/model details, and
+// Save to device / Open original actions.
+function openPreview(item) {
+    const isVideo = groupOf(item) === 'videos';
+    const fullUrl = item.url || item.sourceUrl || '';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'fixed inset-0 z-[120] bg-black/95 backdrop-blur-sm flex flex-col';
+    overlay.innerHTML = `
+        <div class="flex items-center justify-between gap-4 px-4 md:px-8 py-4">
+            <div class="min-w-0">
+                <p class="text-sm font-bold text-white truncate">${item.model || 'unknown model'}</p>
+                <p class="text-[11px] text-secondary truncate">${kindLabel(item)} · ${timeAgo(item.createdAt)}${item.credits ? ` · ${item.credits} cr` : ''}${item.resolution ? ` · ${item.resolution}` : ''}</p>
+            </div>
+            <button data-close class="shrink-0 w-10 h-10 rounded-full bg-white/10 hover:bg-[#ff2d2d] text-white flex items-center justify-center transition-colors" title="Close">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <div class="flex-1 min-h-0 flex items-center justify-center px-4 pb-4">
+            ${isVideo
+                ? `<video src="${fullUrl}" poster="${item.thumb || ''}" controls autoplay playsinline class="max-w-full max-h-full rounded-xl shadow-3xl"></video>`
+                : `<img src="${fullUrl}" alt="${item.model} result" class="max-w-full max-h-full object-contain rounded-xl shadow-3xl">`}
+        </div>
+        <div class="px-4 md:px-8 pb-6 flex flex-col items-center gap-4">
+            ${item.prompt ? `<p class="max-w-3xl text-center text-xs text-secondary leading-relaxed line-clamp-3">${item.prompt}</p>` : ''}
+            <div class="flex items-center gap-3 flex-wrap justify-center">
+                <button data-save class="px-6 py-3 rounded-xl bg-primary text-black text-[11px] font-black uppercase tracking-widest shadow-glow hover:scale-105 active:scale-95 transition-all">Save to device</button>
+                <a href="${item.sourceUrl || fullUrl}" target="_blank" rel="noopener" class="px-6 py-3 rounded-xl bg-white/10 text-white text-[11px] font-black uppercase tracking-widest hover:bg-white/20 transition-all">Open original</a>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const close = () => {
+        overlay.remove();
+        document.removeEventListener('keydown', onKey);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', onKey);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    overlay.querySelector('[data-close]').onclick = close;
+    overlay.querySelector('[data-save]').onclick = (e) => saveToDevice(item, e.currentTarget);
+}
+
+function card(item, onDelete) {
     const ready = Boolean(item.url);
 
     const card = document.createElement('div');
@@ -83,8 +171,29 @@ function card(item) {
             </div>
         </div>
     `;
-    if (openTarget && ready) {
-        card.onclick = () => window.open(openTarget, '_blank');
+    // Red X in the top corner deletes the item from the library.
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-[#ff2d2d] text-white flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-transform';
+    deleteBtn.title = 'Delete from library';
+    deleteBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+    deleteBtn.onclick = async (e) => {
+        e.stopPropagation();
+        if (!window.confirm('Delete this item from the library? This cannot be undone.')) return;
+        deleteBtn.disabled = true;
+        deleteBtn.style.opacity = '0.5';
+        try {
+            await deleteLibraryItem(item.id);
+            if (onDelete) onDelete(item);
+        } catch (err) {
+            deleteBtn.disabled = false;
+            deleteBtn.style.opacity = '';
+            alert(err.message || 'Could not delete this item.');
+        }
+    };
+    card.appendChild(deleteBtn);
+
+    if (ready) {
+        card.onclick = () => openPreview(item);
     } else {
         card.style.cursor = 'default';
         card.classList.remove('cursor-pointer', 'hover:scale-[1.02]');
@@ -127,7 +236,10 @@ export function LibraryPage() {
                 <p class="text-sm text-secondary">${state.filter === 'all' ? 'Nothing generated yet - your creations land here.' : `No ${state.filter} yet.`}</p>
             </div>`;
         } else {
-            items.forEach(item => grid.appendChild(card(item)));
+            items.forEach(item => grid.appendChild(card(item, (deleted) => {
+                state.items = state.items.filter(it => it.id !== deleted.id);
+                renderGrid();
+            })));
         }
     };
 

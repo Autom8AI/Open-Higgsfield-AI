@@ -3,12 +3,14 @@ import { t2vModels, getAspectRatiosForVideoModel, getDurationsForModel, getResol
 import { AuthModal } from './AuthModal.js';
 import { createUploadPicker } from './UploadPicker.js';
 import { savePendingJob, removePendingJob, getPendingJobs } from '../lib/pendingJobs.js';
+import { sortByPriceDesc, loadPricing, modelPrice } from '../lib/modelSort.js';
 
 export function VideoStudio() {
     const container = document.createElement('div');
     container.className = 'w-full h-full flex flex-col items-center justify-center bg-app-bg relative p-4 md:p-6 overflow-y-auto custom-scrollbar overflow-x-hidden';
 
     // --- State ---
+    loadPricing();
     const defaultModel = t2vModels[0];
     let selectedModel = defaultModel.id;
     let selectedModelName = defaultModel.name;
@@ -206,6 +208,11 @@ export function VideoStudio() {
                 picker.reset();
                 uploadedImageUrl = null;
                 imageMode = false;
+            }
+            if (!v2vModels.length) {
+                showVideoIcon();
+                alert('Video-to-video is not available yet — no v2v models are in the registry.');
+                return;
             }
             v2vMode = true;
             selectedModel = v2vModels[0].id;
@@ -440,7 +447,10 @@ export function VideoStudio() {
                             ${isV2V ? '<span class="text-[9px] text-orange-400/70">Upload a video to use</span>' : ''}
                          </div>
                     </div>
-                    ${selectedModel === m.id ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff2d2d" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+                    <div class="flex items-center gap-2">
+                        ${modelPrice(m) != null ? `<span class="text-[10px] font-bold text-muted">${modelPrice(m)} cr</span>` : ''}
+                        ${selectedModel === m.id ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff2d2d" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+                    </div>
                 `;
                 item.onclick = (e) => {
                     e.stopPropagation();
@@ -481,12 +491,12 @@ export function VideoStudio() {
 
                 // Regular generation models (always t2v or i2v, never v2v)
                 const generationModels = imageMode ? i2vModels : t2vModels;
-                const filteredMain = generationModels
+                const filteredMain = sortByPriceDesc(generationModels)
                     .filter(m => m.name.toLowerCase().includes(lf) || m.id.toLowerCase().includes(lf));
                 filteredMain.forEach(m => list.appendChild(makeModelItem(m, false)));
 
                 // Video Tools section
-                const filteredV2V = v2vModels.filter(m => m.name.toLowerCase().includes(lf) || m.id.toLowerCase().includes(lf));
+                const filteredV2V = sortByPriceDesc(v2vModels).filter(m => m.name.toLowerCase().includes(lf) || m.id.toLowerCase().includes(lf));
                 if (filteredV2V.length > 0) {
                     const sectionLabel = document.createElement('div');
                     sectionLabel.className = 'text-[10px] font-bold text-orange-400/70 uppercase tracking-widest px-3 py-2 mt-1 border-t border-white/5';

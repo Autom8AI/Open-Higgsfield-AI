@@ -5,6 +5,7 @@ import {
     getMaxImagesForI2IModel
 } from '../lib/models.js';
 import { ENHANCE_TAGS, QUICK_PROMPTS } from '../lib/promptUtils.js';
+import { sortByPriceDesc, loadPricing, modelPrice } from '../lib/modelSort.js';
 import { AuthModal } from './AuthModal.js';
 import { createUploadPicker } from './UploadPicker.js';
 import { savePendingJob, removePendingJob, getPendingJobs } from '../lib/pendingJobs.js';
@@ -25,6 +26,7 @@ export function ImageStudio() {
     container.className = 'w-full h-full flex flex-col items-center justify-center bg-app-bg relative p-4 md:p-6 overflow-y-auto custom-scrollbar overflow-x-hidden';
 
     // --- State ---
+    loadPricing();
     const defaultModel = t2iModels[0];
     let selectedModel = defaultModel.id;
     let selectedModelName = defaultModel.name;
@@ -662,7 +664,7 @@ export function ImageStudio() {
 
             const renderModels = (filter = '') => {
                 list.innerHTML = '';
-                const filtered = getCurrentModels().filter(m => m.name.toLowerCase().includes(filter.toLowerCase()) || m.id.toLowerCase().includes(filter.toLowerCase()));
+                const filtered = sortByPriceDesc(getCurrentModels()).filter(m => m.name.toLowerCase().includes(filter.toLowerCase()) || m.id.toLowerCase().includes(filter.toLowerCase()));
 
                 filtered.forEach(m => {
                     const item = document.createElement('div');
@@ -674,7 +676,10 @@ export function ImageStudio() {
                                 <span class="text-xs font-bold text-white tracking-tight">${m.name}</span>
                              </div>
                         </div>
-                        ${selectedModel === m.id ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff2d2d" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+                        <div class="flex items-center gap-2">
+                            ${modelPrice(m) != null ? `<span class="text-[10px] font-bold text-muted">${modelPrice(m)} cr</span>` : ''}
+                            ${selectedModel === m.id ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff2d2d" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+                        </div>
                     `;
                     item.onclick = (e) => {
                         e.stopPropagation();

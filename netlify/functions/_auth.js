@@ -1,7 +1,7 @@
 const crypto = require('crypto')
 
 // Direct Airtable access. Base IDs and signing secret are supplied by server-side environment variables.
-const PRIMARY_BASE_ID = process.env.AUTOM8_AIRTABLE_BASE_ID || ''
+const PRIMARY_BASE_ID = process.env.AUTOM8_AIRTABLE_BASE_ID || process.env.AIRTABLE_BASE_ID || ''
 const FALLBACK_BASE_ID = ''
 const BACKUP_BASE_ID = FALLBACK_BASE_ID
 const AIRTABLE_BASE_ID = PRIMARY_BASE_ID

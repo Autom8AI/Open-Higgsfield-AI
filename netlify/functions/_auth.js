@@ -2,8 +2,6 @@ const crypto = require('crypto')
 
 // Direct Airtable access. Base IDs and signing secret are supplied by server-side environment variables.
 const PRIMARY_BASE_ID = process.env.AUTOM8_AIRTABLE_BASE_ID || process.env.AIRTABLE_BASE_ID || ''
-const FALLBACK_BASE_ID = ''
-const BACKUP_BASE_ID = FALLBACK_BASE_ID
 const AIRTABLE_BASE_ID = PRIMARY_BASE_ID
 const AIRTABLE_TABLE_ID = 'tbloKNK7pmGiaEB1K' // App Auth — hardcoded
 const SESSION_COOKIE = 'matai_session'
@@ -168,10 +166,7 @@ async function airtableRequest(baseId, path, options = {}) {
   return body
 }
 
-// Tries the primary base first; only falls back to the backup (copy) base when the primary
-// call comes back rate-limited. Any other failure (auth, not-found, etc.) is NOT retried
-// against the backup — a stale copy can't fix a bad credential or a missing record, and
-// silently reading/writing the wrong base on unrelated errors would be worse than surfacing them.
+// Authentication reads use only the primary CRM base; no automatic backup-base requests.
 async function withBaseFailover(run) {
   if (!PRIMARY_BASE_ID) { const error = new Error('AUTOM8_AIRTABLE_BASE_ID is not configured.'); error.code = 'AIRTABLE_UNAVAILABLE'; throw error }
   // Do not issue another Airtable request after rate limiting.

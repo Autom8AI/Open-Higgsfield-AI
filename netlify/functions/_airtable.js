@@ -1,10 +1,9 @@
 // Airtable storage — every call is forwarded through Composio's proxy-execute
-// with the ACTIVE airtable connected account (the single COMPOSIO_API_KEY
-// server secret). Champion Auto Spa media base appSYUhlcApc5k3PO; base/table
-// IDs stay hardcoded.
+// with the active Airtable connected account. Base IDs are server-side env vars;
+// table IDs remain constants.
 const { toolkitFetch } = require('./_composio')
 
-const BASE_ID = 'appSYUhlcApc5k3PO' // Champion Auto Spa — hardcoded
+const BASE_ID = process.env.CHAMPION_AIRTABLE_BASE_ID || process.env.AIRTABLE_BASE_ID || ''
 const GENERATIONS = 'tbleSsBerfkEtTFTk' // Generations — hardcoded
 const AVATARS = 'tblsT27uHkU21Csq0' // Avatars — hardcoded
 
@@ -34,8 +33,10 @@ const headers = () => ({
   'Content-Type': 'application/json',
 })
 
-const api = (table, suffix = '') =>
-  `https://api.airtable.com/v0/${BASE_ID}/${table}${suffix}`
+const api = (table, suffix = '') => {
+  if (!BASE_ID) throw new Error('CHAMPION_AIRTABLE_BASE_ID is not configured.')
+  return `https://api.airtable.com/v0/${BASE_ID}/${table}${suffix}`
+}
 
 async function airtableFetch(url, options = {}) {
   const res = await toolkitFetch('airtable', url, {

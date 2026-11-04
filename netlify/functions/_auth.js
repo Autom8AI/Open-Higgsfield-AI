@@ -3,8 +3,8 @@ const crypto = require('crypto')
 // Direct Airtable — mirrors motivquotez/netlify/functions/_auth.js hardcoding.
 // Hardcoded IDs (no env indirection) per motivquotez pattern: primary applP85ZQYvmFGSxa
 // (Autom8 Me CRM), fallback appxWa7YNYpMjIVAz (copy). No Composio.
-const PRIMARY_BASE_ID = 'applP85ZQYvmFGSxa' // Autom8 Me CRM — hardcoded (motivquotez primary)
-const FALLBACK_BASE_ID = 'appxWa7YNYpMjIVAz' // Autom8 Me CRM (copy) — hardcoded fallback
+const PRIMARY_BASE_ID = process.env.AUTOM8_AIRTABLE_BASE_ID || process.env.AIRTABLE_BASE_ID || ''
+const FALLBACK_BASE_ID = process.env.AUTOM8_AIRTABLE_FALLBACK_BASE_ID || process.env.AIRTABLE_FALLBACK_BASE_ID || ''
 const BACKUP_BASE_ID = FALLBACK_BASE_ID
 const AIRTABLE_BASE_ID = PRIMARY_BASE_ID
 const AIRTABLE_TABLE_ID = 'tbloKNK7pmGiaEB1K' // App Auth — hardcoded
@@ -119,8 +119,9 @@ function sha256(value) {
   return crypto.createHash('sha256').update(String(value)).digest('hex')
 }
 
-const SESSION_SECRET = sha256('matai-content-factory-session-v2') // hardcoded — no env needed
+const SESSION_SECRET = process.env.MATAI_SESSION_SECRET || ''
 function secret() {
+  if (!SESSION_SECRET) throw new Error('MATAI_SESSION_SECRET is not configured.')
   return SESSION_SECRET
 }
 
@@ -174,6 +175,7 @@ async function airtableRequest(baseId, path, options = {}) {
 // against the backup — a stale copy can't fix a bad credential or a missing record, and
 // silently reading/writing the wrong base on unrelated errors would be worse than surfacing them.
 async function withBaseFailover(run) {
+  if (!PRIMARY_BASE_ID) { const error = new Error('AUTOM8_AIRTABLE_BASE_ID is not configured.'); error.code = 'AIRTABLE_UNAVAILABLE'; throw error }
   try {
     return await run(PRIMARY_BASE_ID)
   } catch (error) {

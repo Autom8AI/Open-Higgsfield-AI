@@ -3,7 +3,7 @@
 // table IDs remain constants.
 const { toolkitFetch } = require('./_composio')
 
-const BASE_ID = process.env.CHAMPION_AIRTABLE_BASE_ID || process.env.AIRTABLE_BASE_ID || ''
+const BASE_ID = process.env.CHAMPION_AIRTABLE_BASE_ID || ''
 const GENERATIONS = 'tbleSsBerfkEtTFTk' // Generations — hardcoded
 const AVATARS = 'tblsT27uHkU21Csq0' // Avatars — hardcoded
 

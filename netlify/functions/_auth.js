@@ -174,21 +174,9 @@ async function airtableRequest(baseId, path, options = {}) {
 // silently reading/writing the wrong base on unrelated errors would be worse than surfacing them.
 async function withBaseFailover(run) {
   if (!PRIMARY_BASE_ID) { const error = new Error('AUTOM8_AIRTABLE_BASE_ID is not configured.'); error.code = 'AIRTABLE_UNAVAILABLE'; throw error }
-  try {
-    return await run(PRIMARY_BASE_ID)
-  } catch (error) {
-    if (error?.rateLimited && BACKUP_BASE_ID && BACKUP_BASE_ID !== PRIMARY_BASE_ID) {
-      try {
-        return await run(BACKUP_BASE_ID)
-      } catch (fallbackError) {
-        fallbackError.usedBackupBase = true
-        throw fallbackError
-      }
-    }
-    throw error
-  }
+  // Do not issue another Airtable request after rate limiting.
+  return run(PRIMARY_BASE_ID)
 }
-
 function escapeFormula(value) {
   return String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'")
 }

@@ -1,8 +1,6 @@
 const crypto = require('crypto')
 
-// Direct Airtable — mirrors motivquotez/netlify/functions/_auth.js hardcoding.
-// Hardcoded IDs (no env indirection) per motivquotez pattern: primary applP85ZQYvmFGSxa
-// (Autom8 Me CRM), fallback appxWa7YNYpMjIVAz (copy). No Composio.
+// Direct Airtable access. Base IDs and signing secret are supplied by server-side environment variables.
 const PRIMARY_BASE_ID = process.env.AUTOM8_AIRTABLE_BASE_ID || process.env.AIRTABLE_BASE_ID || ''
 const FALLBACK_BASE_ID = process.env.AUTOM8_AIRTABLE_FALLBACK_BASE_ID || process.env.AIRTABLE_FALLBACK_BASE_ID || ''
 const BACKUP_BASE_ID = FALLBACK_BASE_ID

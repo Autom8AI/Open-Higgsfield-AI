@@ -3,7 +3,7 @@ import { t2vModels, getAspectRatiosForVideoModel, getDurationsForModel, getResol
 import { AuthModal } from './AuthModal.js';
 import { createUploadPicker } from './UploadPicker.js';
 import { savePendingJob, removePendingJob, getPendingJobs, startGenerationJob } from '../lib/pendingJobs.js';
-import { sortByPriceDesc, loadPricing, priceChipHtml, estimateCredits } from '../lib/modelSort.js';
+import { sortByPriceDesc, loadPricing, priceChipHtml, costText } from '../lib/modelSort.js';
 import { createQueueHistory, pendingThumbHtml, creditBadgeHtml, costMeta } from '../lib/studioQueue.js';
 import { advancedFieldsFor } from '../lib/videoSpecs.js';
 
@@ -343,8 +343,7 @@ export function VideoStudio() {
     const refreshCost = () => {
         if (v2vMode) { costEl.textContent = ''; return; }
         const model = getCurrentModel();
-        const credits = model ? estimateCredits(model, { duration: selectedDuration, resolution: selectedResolution }) : null;
-        costEl.textContent = credits != null ? `≈ ${credits} cr` : '';
+        costEl.textContent = model ? costText(model, { duration: selectedDuration, resolution: selectedResolution }) : '';
     };
     loadPricing().then(refreshCost);
 

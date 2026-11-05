@@ -8,7 +8,7 @@
 import { kie } from '../lib/kie.js';
 import { REMIX_MODES, REMIX_SPECS, REMIX_LABELS, modelsForMode } from '../lib/remixSpecs.js';
 import { startGenerationJob, getPendingJobs, removePendingJob } from '../lib/pendingJobs.js';
-import { loadPricing, estimateCredits, priceLabel } from '../lib/modelSort.js';
+import { loadPricing, costText, priceLabel } from '../lib/modelSort.js';
 import { createQueueHistory, costMeta } from '../lib/studioQueue.js';
 import { renderResultGrid } from '../lib/resultCards.js';
 import { createUploadPicker } from './UploadPicker.js';
@@ -298,8 +298,7 @@ export function RemixStudio() {
 
     function refreshCost() {
         const model = modelObj(modelId);
-        const credits = video ? estimateCredits(model, { duration: video.duration, resolution }) : null;
-        costEl.textContent = credits != null ? `≈ ${credits} cr` : (video ? '' : priceLabel(model, resolution));
+        costEl.textContent = video ? costText(model, { duration: video.duration, resolution }) : priceLabel(model, resolution);
     }
     function validation() {
         if (uploading) return 'Uploading the video…';

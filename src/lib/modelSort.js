@@ -78,10 +78,13 @@ export function priceInfo(model, resolution) {
         if (!res || !table) return null;
         return table[res] || table[res.toLowerCase()] || table[res.toUpperCase()] || null;
     };
-    return pick(at(p.measuredByResolution), p.measuredUnit)
+    const measured = pick(at(p.measuredByResolution), p.measuredUnit)
         || pick(at(p.byResolution), p.unit)
-        || pick({ credits: p.measuredCredits, unit: p.measuredUnit }, p.measuredUnit)
-        || pick(p, p.unit);
+        || pick({ credits: p.measuredCredits, unit: p.measuredUnit }, p.measuredUnit);
+    if (measured) return measured;
+    // Published kie.ai "from" price: the model's cheapest option.
+    const published = pick(p, p.unit);
+    return published ? { ...published, from: Boolean(p.from) } : null;
 }
 
 const round = (n) => Math.round(n * 10) / 10;
@@ -102,7 +105,7 @@ export function priceLabel(model, resolution) {
     const info = priceInfo(model, resolution);
     if (!info) return '';
     const unit = String(info.unit || '').replace(/^cr\//, '').replace('sec', 's');
-    return `${round(info.credits)} cr${unit ? '/' + unit : ''}`;
+    return `${info.from ? 'from ' : ''}${round(info.credits)} cr${unit ? '/' + unit : ''}`;
 }
 
 // Right-aligned price chip used in model dropdowns.
@@ -116,6 +119,6 @@ export function priceChipHtml(model, resolution) {
 // the input), or '' when nothing is known.
 export function costText(model, opts = {}) {
     const credits = estimateCredits(model, opts);
-    if (credits != null) return `≈ ${credits} cr`;
+    if (credits != null) return `${priceInfo(model, opts.resolution)?.from ? 'from' : '≈'} ${credits} cr`;
     return priceLabel(model, opts.resolution);
 }

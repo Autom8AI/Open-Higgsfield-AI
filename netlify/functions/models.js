@@ -80,7 +80,43 @@ function normalizeModel(model) {
   }
 }
 
-const allModels = () => [...models().map(normalizeModel), ...KIE_EXTRA_MODELS, ...FAL_MODELS]
+// Published kie.ai starting prices (kie.ai/pricing, checked 2026-11-05;
+// 1 credit ≈ US$0.005). These are each model's cheapest option, so they are
+// flagged `from: true`; measured averages from real runs replace them.
+const KIE_FROM_PRICES = {
+  'bytedance/seedance-2': [11.5, 'cr/sec'],
+  'bytedance/seedance-2-fast': [6.8, 'cr/sec'],
+  'kling-3.0/video': [15.1, 'cr/sec'],
+  'kling/v3-turbo-text-to-video': [20.2, 'cr/sec'],
+  'wan/2-5-text-to-video': [60, 'cr/video'],
+  'happyhorse-1-1/text-to-video': [22.5, 'cr/sec'],
+  'happyhorse-1-1/reference-to-video': [22.5, 'cr/sec'],
+  'happyhorse/reference-to-video': [22.5, 'cr/sec'],
+  'kling-3.0/motion-control': [22.7, 'cr/sec'],
+  'wan/2-7-videoedit': [16, 'cr/sec'],
+  'google/nano-banana': [4, 'cr/image'],
+  'nano-banana-2': [8, 'cr/image'],
+  'nano-banana-2-lite': [8, 'cr/image'],
+  'nano-banana-pro': [18, 'cr/image'],
+  'google/nano-banana-edit': [4, 'cr/image'],
+  'gpt-image-2-text-to-image': [6, 'cr/image'],
+  'gpt-image-2-image-to-image': [6, 'cr/image'],
+  'ideogram/v3-text-to-image': [3.5, 'cr/image'],
+  'omnihuman-1-5': [27, 'cr/sec'],
+  'kling/ai-avatar-standard': [10.1, 'cr/sec'],
+  'kling/ai-avatar-pro': [10.1, 'cr/sec'],
+  'infinitalk/from-audio': [3, 'cr/sec'],
+  'wan/2-2-a14b-speech-to-video-turbo': [12, 'cr/sec'],
+}
+
+function withPublishedPrice(model) {
+  if (model.pricing) return model
+  const p = KIE_FROM_PRICES[model.id]
+  if (!p) return model
+  return { ...model, pricing: { credits: p[0], unit: p[1], usd: Math.round(p[0] * 0.005 * 1000) / 1000, runs: 0, source: 'published', from: true } }
+}
+
+const allModels = () => [...models().map(normalizeModel), ...KIE_EXTRA_MODELS, ...FAL_MODELS].map(withPublishedPrice)
 
 exports.handler = guard('models', async function (event) {
   if (event.httpMethod === 'OPTIONS') return json(200, { ok: true })
@@ -130,6 +166,9 @@ exports.handler = guard('models', async function (event) {
     models: allModels().map((model) => {
       const observed = measured[model.id]
       if (!observed) return model
+      // Old runs stored without a duration are per-video averages; they cannot be
+      // compared with a per-second price, so keep the published rate for those.
+      if (/sec/.test(model.pricing?.unit || '') && !/sec/.test(observed.unit)) return model
       if (!model.pricing) return { ...model, pricing: observed }
       return {
         ...model,

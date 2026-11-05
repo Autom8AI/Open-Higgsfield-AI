@@ -11,7 +11,7 @@ import { buildPrompt } from '../lib/api.js';
 import { t2vModels } from '../lib/models.js';
 import { getVideoSpec } from '../lib/videoSpecs.js';
 import { startGenerationJob, getPendingJobs, removePendingJob } from '../lib/pendingJobs.js';
-import { loadPricing, estimateCredits, priceLabel, sortByPriceDesc } from '../lib/modelSort.js';
+import { loadPricing, priceInfo, priceLabel, sortByPriceDesc } from '../lib/modelSort.js';
 import { createQueueHistory, costMeta } from '../lib/studioQueue.js';
 import { renderResultGrid } from '../lib/resultCards.js';
 
@@ -79,6 +79,7 @@ export function FactoryStudio() {
     syncModelDefaults();
 
     const cost = () => costMeta(model, { duration: state.duration, resolution: state.resolution });
+    const approx = () => (priceInfo(model, state.resolution)?.from ? 'from' : '≈');
 
     // ==========================================
     // Page header
@@ -293,7 +294,7 @@ export function FactoryStudio() {
         const each = c.credits;
         const n = state.drafts.length || state.count;
         totalEl.textContent = each != null
-            ? `${state.count} clip${state.count > 1 ? 's' : ''} · ≈ ${Math.round(each * state.count * 10) / 10} cr total`
+            ? `${state.count} clip${state.count > 1 ? 's' : ''} · ${approx()} ${Math.round(each * state.count * 10) / 10} cr total`
             : `${state.count} clip${state.count > 1 ? 's' : ''}`;
         renderScenes();
     }
@@ -394,7 +395,7 @@ export function FactoryStudio() {
         const total = document.createElement('div');
         total.className = 'text-xs font-bold text-secondary';
         total.textContent = c != null
-            ? `${state.drafts.length} clip${state.drafts.length === 1 ? '' : 's'} · ≈ ${Math.round(c * state.drafts.length * 10) / 10} cr`
+            ? `${state.drafts.length} clip${state.drafts.length === 1 ? '' : 's'} · ${approx()} ${Math.round(c * state.drafts.length * 10) / 10} cr`
             : `${state.drafts.length} clip${state.drafts.length === 1 ? '' : 's'}`;
         generateAll = document.createElement('button');
         generateAll.type = 'button';

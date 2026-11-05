@@ -5,7 +5,7 @@ import {
     getMaxImagesForI2IModel
 } from '../lib/models.js';
 import { ENHANCE_TAGS, QUICK_PROMPTS } from '../lib/promptUtils.js';
-import { sortByPriceDesc, loadPricing, priceChipHtml, estimateCredits } from '../lib/modelSort.js';
+import { sortByPriceDesc, loadPricing, priceChipHtml, costText } from '../lib/modelSort.js';
 import { createQueueHistory, pendingThumbHtml, creditBadgeHtml, costMeta } from '../lib/studioQueue.js';
 import { AuthModal } from './AuthModal.js';
 import { createUploadPicker } from './UploadPicker.js';
@@ -222,8 +222,7 @@ export function ImageStudio() {
     const currentResolution = () => (getCurrentQualityField(selectedModel) ? document.getElementById('quality-btn-label')?.textContent : '');
     const refreshCost = () => {
         const model = getCurrentModels().find(m => m.id === selectedModel);
-        const credits = model ? estimateCredits(model, { resolution: currentResolution() }) : null;
-        costEl.textContent = credits != null ? `≈ ${credits} cr` : '';
+        costEl.textContent = model ? costText(model, { resolution: currentResolution() }) : '';
     };
     loadPricing().then(refreshCost);
 

@@ -627,7 +627,7 @@ for (const m of t2vModels) {
   if (spec?.durationDefault && !m.inputs.duration) m.inputs.duration = { default: spec.durationDefault };
 }
 // Image-to-video: every video model that takes images (same objects, shared ids).
-i2vModels.push(...t2vModels.filter(m => m.images || getVideoSpec(m.id)?.imageOnly));
+i2vModels.push(...t2vModels.filter(m => (m.images || getVideoSpec(m.id)?.imageOnly) && !i2vModels.some(x => x.id === m.id)));
 // Text-to-video list drops models that cannot run without an image.
 for (let i = t2vModels.length - 1; i >= 0; i--) {
   if (t2vModels[i].images?.required || getVideoSpec(t2vModels[i].id)?.imageOnly) t2vModels.splice(i, 1);

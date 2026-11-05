@@ -6,8 +6,8 @@
 
 const BASE = 'https://backend.composio.dev/api/v3.1'
 
-const ORG_ID = process.env.COMPOSIO_ORG_ID || 'ok_BENL25Qrhbop'
-const PROJECT_ID = process.env.COMPOSIO_PROJECT_ID || 'pr_fb2sLe69ksF_'
+const ORG_ID = process.env.COMPOSIO_ORG_ID || ''
+const PROJECT_ID = process.env.COMPOSIO_PROJECT_ID || ''
 
 const apiKey = () => String(process.env.COMPOSIO_API_KEY || '').trim()
 const hasComposio = () => Boolean(apiKey())

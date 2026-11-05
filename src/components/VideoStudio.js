@@ -2,8 +2,9 @@ import { kie } from '../lib/kie.js';
 import { t2vModels, getAspectRatiosForVideoModel, getDurationsForModel, getResolutionsForVideoModel, i2vModels, getAspectRatiosForI2VModel, getDurationsForI2VModel, getResolutionsForI2VModel, v2vModels, getModesForModel } from '../lib/models.js';
 import { AuthModal } from './AuthModal.js';
 import { createUploadPicker } from './UploadPicker.js';
-import { savePendingJob, removePendingJob, getPendingJobs } from '../lib/pendingJobs.js';
+import { savePendingJob, removePendingJob, getPendingJobs, startGenerationJob } from '../lib/pendingJobs.js';
 import { sortByPriceDesc, loadPricing, modelPrice } from '../lib/modelSort.js';
+import { advancedFieldsFor } from '../lib/videoSpecs.js';
 
 export function VideoStudio() {
     const container = document.createElement('div');
@@ -26,6 +27,9 @@ export function VideoStudio() {
     let imageMode = false; // false = t2v models, true = i2v models
     let v2vMode = false;   // true = video-to-video tools mode
     let uploadedVideoUrl = null;
+    let advancedOpen = false;
+    let advancedValues = {}; // per-model values for the Advanced panel, reset on model change
+    let jobsInFlight = 0;
 
     const getCurrentModels = () => v2vMode ? v2vModels : (imageMode ? i2vModels : t2vModels);
     const getCurrentAspectRatios = (id) => imageMode ? getAspectRatiosForI2VModel(id) : getAspectRatiosForVideoModel(id);
@@ -91,21 +95,29 @@ export function VideoStudio() {
             }
             if (!imageMode) {
                 imageMode = true;
-                selectedModel = i2vModels[0].id;
-                selectedModelName = i2vModels[0].name;
-                document.getElementById('v-model-btn-label').textContent = selectedModelName;
-                updateControlsForModel(selectedModel);
+                const keep = i2vModels.find(m => m.id === selectedModel);
+                const next = keep || i2vModels[0];
+                if (next) {
+                    selectedModel = next.id;
+                    selectedModelName = next.name;
+                    document.getElementById('v-model-btn-label').textContent = selectedModelName;
+                }
+                updateControlsForModel(selectedModel, !!keep);
+            } else {
+                renderAdvanced();
             }
-            textarea.placeholder = 'Describe the motion or effect (optional)';
+            textarea.placeholder = 'Describe the motion or what happens in the video';
             textarea.disabled = false;
         },
         onClear: () => {
             uploadedImageUrl = null;
             imageMode = false;
-            selectedModel = t2vModels[0].id;
-            selectedModelName = t2vModels[0].name;
+            const keep = t2vModels.find(m => m.id === selectedModel);
+            const next = keep || t2vModels[0];
+            selectedModel = next.id;
+            selectedModelName = next.name;
             document.getElementById('v-model-btn-label').textContent = selectedModelName;
-            updateControlsForModel(selectedModel);
+            updateControlsForModel(selectedModel, !!keep);
             textarea.placeholder = 'Describe the video you want to create';
             textarea.disabled = false;
         }
@@ -229,7 +241,8 @@ export function VideoStudio() {
         videoFileInput.value = '';
     };
 
-    topRow.appendChild(videoPickerBtn);
+    // Video-to-video tools are not available on the current backend; hide the button until they are.
+    if (v2vModels.length > 0) topRow.appendChild(videoPickerBtn);
 
     const textarea = document.createElement('textarea');
     textarea.placeholder = 'Describe the video you want to create';
@@ -320,6 +333,7 @@ export function VideoStudio() {
     modeBtn.style.display = getModesForModel(defaultModel.id).length > 0 ? 'flex' : 'none';
 
     const generateBtn = document.createElement('button');
+    let submitting = false;
     generateBtn.className = 'bg-primary text-black px-6 md:px-8 py-3 md:py-3.5 rounded-xl md:rounded-[1.5rem] font-black text-sm md:text-base hover:shadow-glow hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2.5 w-full sm:w-auto shadow-lg';
     generateBtn.setAttribute('data-tooltip', 'Generate AI video from prompt');
     generateBtn.innerHTML = `Generate ✨`;
@@ -327,6 +341,133 @@ export function VideoStudio() {
     bottomRow.appendChild(controlsLeft);
     bottomRow.appendChild(generateBtn);
     bar.appendChild(bottomRow);
+
+    // ==========================================
+    // 2b. ADVANCED PANEL
+    // ==========================================
+    const advancedPanel = document.createElement('div');
+    advancedPanel.id = 'v-advanced-panel';
+    advancedPanel.className = 'hidden flex-col gap-3 px-2 pt-4 border-t border-white/5';
+    bar.appendChild(advancedPanel);
+
+    const setAdvancedOpen = (open) => {
+        advancedOpen = open;
+        advancedPanel.classList.toggle('hidden', !open);
+        advancedPanel.classList.toggle('flex', open);
+        advancedBtn.classList.toggle('border-primary/40', open);
+        advancedBtn.classList.toggle('bg-white/10', open);
+        advancedBtn.setAttribute('data-tooltip', open ? 'Hide advanced options' : 'Show advanced options');
+        const chev = advancedBtn.querySelector('svg:last-child');
+        if (chev) chev.style.transform = open ? 'rotate(180deg)' : '';
+    };
+
+    const advancedValue = (f) => (advancedValues[f.key] !== undefined ? advancedValues[f.key] : f.default);
+
+    function renderAdvanced() {
+        const fields = v2vMode ? [] : advancedFieldsFor(selectedModel, imageMode);
+        advancedBtn.style.display = fields.length ? 'flex' : 'none';
+        if (!fields.length) { setAdvancedOpen(false); advancedPanel.innerHTML = ''; return; }
+
+        advancedPanel.innerHTML = '';
+        const grid = document.createElement('div');
+        grid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-2.5';
+
+        fields.forEach(f => {
+            const row = document.createElement('div');
+            const isToggle = f.type === 'toggle';
+            row.className = `bg-white/5 border border-white/5 rounded-2xl px-4 py-3 ${isToggle ? 'flex items-center justify-between gap-4' : 'flex flex-col gap-2'} ${f.type === 'text' ? 'sm:col-span-2' : ''}`;
+            const head = document.createElement('div');
+            head.className = isToggle ? 'flex flex-col gap-0.5 min-w-0 flex-1' : 'flex items-center justify-between gap-3';
+            const title = document.createElement('span');
+            title.className = 'text-xs font-bold text-white';
+            title.textContent = f.label;
+            head.appendChild(title);
+            if (isToggle && f.hint) {
+                const hint = document.createElement('span');
+                hint.className = 'text-[10px] text-secondary opacity-70 leading-snug';
+                hint.textContent = f.hint;
+                head.appendChild(hint);
+            }
+            row.appendChild(head);
+
+            if (f.type === 'toggle') {
+                const sw = document.createElement('button');
+                sw.type = 'button';
+                const paint = () => {
+                    const on = !!advancedValue(f);
+                    sw.className = `relative w-10 h-6 shrink-0 rounded-full transition-colors ${on ? 'bg-primary' : 'bg-white/15'}`;
+                    sw.innerHTML = `<span class="absolute top-1 ${on ? 'left-5' : 'left-1'} w-4 h-4 rounded-full bg-white transition-all"></span>`;
+                    sw.setAttribute('aria-pressed', on ? 'true' : 'false');
+                };
+                sw.onclick = (e) => { e.preventDefault(); e.stopPropagation(); advancedValues[f.key] = !advancedValue(f); paint(); };
+                paint();
+                row.appendChild(sw);
+            } else if (f.type === 'select') {
+                const wrap = document.createElement('div');
+                wrap.className = 'flex flex-wrap gap-1.5';
+                const paint = () => {
+                    wrap.innerHTML = '';
+                    f.options.forEach(opt => {
+                        const b = document.createElement('button');
+                        b.type = 'button';
+                        const on = advancedValue(f) === opt;
+                        b.className = `px-3 py-1.5 rounded-xl text-[11px] font-bold capitalize transition-all border ${on ? 'bg-primary text-black border-primary' : 'bg-white/5 text-white/80 border-white/10 hover:border-primary/40'}`;
+                        b.textContent = opt;
+                        b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); advancedValues[f.key] = opt; paint(); };
+                        wrap.appendChild(b);
+                    });
+                };
+                paint();
+                row.appendChild(wrap);
+            } else {
+                const input = document.createElement(f.type === 'text' ? 'textarea' : 'input');
+                if (f.type === 'number') { input.type = 'number'; input.step = '1'; input.min = '0'; input.placeholder = 'Random'; }
+                else { input.rows = 2; input.placeholder = f.hint || ''; if (f.max) input.maxLength = f.max; }
+                input.className = 'w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted focus:outline-none focus:border-primary/50 resize-none';
+                input.value = advancedValue(f) ?? '';
+                input.onclick = (e) => e.stopPropagation();
+                input.oninput = () => { advancedValues[f.key] = input.value; };
+                row.appendChild(input);
+                if (f.type === 'number') {
+                    const dice = document.createElement('button');
+                    dice.type = 'button';
+                    dice.className = 'text-[10px] font-bold text-secondary hover:text-primary transition-colors';
+                    dice.textContent = '🎲 Random';
+                    dice.onclick = (e) => {
+                        e.preventDefault(); e.stopPropagation();
+                        input.value = String(Math.floor(Math.random() * 2147483647));
+                        advancedValues[f.key] = input.value;
+                    };
+                    head.appendChild(dice);
+                }
+            }
+
+            if (f.hint && f.type !== 'text' && !isToggle) {
+                const hint = document.createElement('span');
+                hint.className = 'text-[10px] text-secondary opacity-70 leading-snug';
+                hint.textContent = f.hint;
+                row.appendChild(hint);
+            }
+            grid.appendChild(row);
+        });
+
+        advancedPanel.appendChild(grid);
+
+        const reset = document.createElement('button');
+        reset.type = 'button';
+        reset.className = 'self-end text-[10px] font-bold uppercase tracking-widest text-secondary hover:text-primary transition-colors';
+        reset.textContent = 'Reset to defaults';
+        reset.onclick = (e) => { e.preventDefault(); e.stopPropagation(); advancedValues = {}; renderAdvanced(); };
+        advancedPanel.appendChild(reset);
+    }
+
+    advancedPanel.onclick = (e) => e.stopPropagation();
+    advancedBtn.onclick = (e) => {
+        e.stopPropagation();
+        closeDropdown();
+        setAdvancedOpen(!advancedOpen);
+    };
+    renderAdvanced();
     promptWrapper.appendChild(bar);
     container.appendChild(promptWrapper);
 
@@ -336,8 +477,11 @@ export function VideoStudio() {
     const dropdown = document.createElement('div');
     dropdown.className = 'absolute bottom-[102%] left-2 z-50 transition-all opacity-0 pointer-events-none scale-95 origin-bottom-left glass rounded-3xl p-3 translate-y-2 w-[calc(100vw-3rem)] max-w-xs shadow-4xl border border-white/10 flex flex-col';
 
-    const updateControlsForModel = (modelId) => {
+    // keepSettings=true keeps the current AR/duration/resolution when the new model supports them.
+    const updateControlsForModel = (modelId, keepSettings = false) => {
         const model = getCurrentModels().find(m => m.id === modelId);
+        if (!keepSettings) advancedValues = {};
+        renderAdvanced();
 
         // In v2v mode, hide all parameter controls — no prompt/AR/duration/etc needed
         if (v2vMode) {
@@ -354,7 +498,10 @@ export function VideoStudio() {
         // Aspect ratio
         const availableArs = getCurrentAspectRatios(modelId);
         if (availableArs.length > 0) {
-            selectedAr = availableArs[0];
+            if (!(keepSettings && availableArs.includes(selectedAr))) {
+                selectedAr = availableArs.includes(model?.inputs?.aspect_ratio?.default) ? model.inputs.aspect_ratio.default
+                    : (availableArs.includes('16:9') ? '16:9' : availableArs[0]);
+            }
             document.getElementById('v-ar-btn-label').textContent = selectedAr;
             arBtn.style.display = 'flex';
         } else {
@@ -364,7 +511,10 @@ export function VideoStudio() {
         // Duration
         const durations = getCurrentDurations(modelId);
         if (durations.length > 0) {
-            selectedDuration = durations[0];
+            if (!(keepSettings && durations.includes(selectedDuration))) {
+                const d = model?.inputs?.duration?.default;
+                selectedDuration = durations.includes(d) ? d : durations[0];
+            }
             document.getElementById('v-duration-btn-label').textContent = `${selectedDuration}s`;
             durationBtn.style.display = 'flex';
         } else {
@@ -374,7 +524,10 @@ export function VideoStudio() {
         // Resolution
         const resolutions = getCurrentResolutions(modelId);
         if (resolutions.length > 0) {
-            selectedResolution = resolutions[0];
+            if (!(keepSettings && resolutions.includes(selectedResolution))) {
+                const r = model?.inputs?.resolution?.default;
+                selectedResolution = resolutions.includes(r) ? r : resolutions[0];
+            }
             document.getElementById('v-resolution-btn-label').textContent = selectedResolution;
             resolutionBtn.style.display = 'flex';
         } else {
@@ -748,6 +901,15 @@ export function VideoStudio() {
         };
     };
 
+    // --- Helper: Short error banner (used by background jobs) ---
+    const flashBanner = (text) => {
+        const el = document.createElement('div');
+        el.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-[#111] border border-red-500/40 text-white text-sm px-5 py-3 rounded-2xl shadow-xl';
+        el.textContent = text;
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 5000);
+    };
+
     // --- Helper: Add to history ---
     const addToHistory = (entry) => {
         generationHistory.unshift(entry);
@@ -919,6 +1081,7 @@ export function VideoStudio() {
     // 5. GENERATION LOGIC
     // ==========================================
     generateBtn.onclick = async () => {
+        if (submitting) return;
         const prompt = textarea.value.trim();
         const model = getCurrentModel();
         const isExtendMode = model?.requiresRequestId;
@@ -938,6 +1101,10 @@ export function VideoStudio() {
                 alert('Please upload a start frame image first.');
                 return;
             }
+            if (!prompt) {
+                alert('Please describe the motion — this model needs a prompt even with an image.');
+                return;
+            }
         } else {
             if (!prompt) {
                 alert('Please enter a prompt to generate a video.');
@@ -952,77 +1119,45 @@ export function VideoStudio() {
             return;
         }
 
-        hero.classList.add('opacity-0', 'scale-95', '-translate-y-10', 'pointer-events-none');
-        generateBtn.disabled = true;
-        generateBtn.innerHTML = `<span class="animate-spin inline-block mr-2 text-black">◌</span> Generating...`;
+        // Prompt, uploads and hero stay on screen. The button is only busy while the
+        // job is being queued; polling continues in the background so another job can start.
+        const submittedModel = selectedModel;
+        const submittedAr = selectedAr;
+        const submittedDuration = selectedDuration;
+        const submittedResolution = selectedResolution;
+        const submittedAdvanced = { ...advancedValues };
+        const submittedImageMode = imageMode;
+        const submittedV2V = v2vMode;
+        const historyMeta = { prompt, model: submittedModel, aspect_ratio: submittedAr, duration: submittedDuration };
+        let queuedId = null;
 
-        let hadError = false;
-        let capturedRequestId = null;
-        const historyMeta = { prompt, model: selectedModel, aspect_ratio: selectedAr, duration: selectedDuration };
+        const runJob = (queueRequest) => {
+            const onRequestId = (rid) => {
+                queuedId = rid;
+                queueRequest(rid);
+            };
 
-        const onRequestId = (rid) => {
-            capturedRequestId = rid;
-            savePendingJob({ requestId: rid, studioType: 'video', historyMeta, maxAttempts: 900, interval: 2000, submittedAt: Date.now() });
-        };
-
-        try {
-            if (v2vMode) {
-                const res = await kie.processV2V({ model: selectedModel, video_url: uploadedVideoUrl, onRequestId });
-                console.log('[VideoStudio] V2V response:', res);
-                if (res && res.url) {
-                    if (capturedRequestId) removePendingJob(capturedRequestId);
-                    const genId = res.id || capturedRequestId || Date.now().toString();
-                    lastGenerationId = null;
-                    lastGenerationModel = null;
-                    addToHistory({ id: genId, url: res.url, prompt: '', model: selectedModel, timestamp: new Date().toISOString() });
-                    showVideoInCanvas(res.url, selectedModel);
-                } else {
-                    throw new Error('No video URL returned by API');
-                }
-                generateBtn.disabled = false;
-                generateBtn.innerHTML = `Generate ✨`;
-                return;
+            if (submittedV2V) {
+                return kie.processV2V({ model: submittedModel, video_url: uploadedVideoUrl, onRequestId });
             }
 
-            if (imageMode) {
+            if (submittedImageMode) {
                 const i2vParams = {
-                    model: selectedModel,
+                    model: submittedModel,
                     image_url: uploadedImageUrl,
                     onRequestId,
                 };
                 if (prompt) i2vParams.prompt = prompt;
-                i2vParams.aspect_ratio = selectedAr;
-                const durations = getCurrentDurations(selectedModel);
-                if (durations.length > 0) i2vParams.duration = selectedDuration;
-                const resolutions = getCurrentResolutions(selectedModel);
-                if (resolutions.length > 0) i2vParams.resolution = selectedResolution;
-                if (selectedQuality) i2vParams.quality = selectedQuality;
-                if (selectedMode) i2vParams.mode = selectedMode;
-
-                const res = await kie.generateI2V(i2vParams);
-                console.log('[VideoStudio] I2V response:', res);
-
-                if (res && res.url) {
-                    if (capturedRequestId) removePendingJob(capturedRequestId);
-                    const genId = res.id || capturedRequestId || Date.now().toString();
-                    if (selectedModel === 'seedance-v2.0-i2v') {
-                        lastGenerationId = genId;
-                        lastGenerationModel = selectedModel;
-                    } else {
-                        lastGenerationId = null;
-                        lastGenerationModel = null;
-                    }
-                    addToHistory({ id: genId, url: res.url, prompt, model: selectedModel, aspect_ratio: selectedAr, duration: selectedDuration, timestamp: new Date().toISOString() });
-                    showVideoInCanvas(res.url, selectedModel);
-                } else {
-                    throw new Error('No video URL returned by API');
-                }
-                generateBtn.disabled = false;
-                generateBtn.innerHTML = `Generate ✨`;
-                return;
+                i2vParams.aspect_ratio = submittedAr;
+                const durations = getCurrentDurations(submittedModel);
+                if (durations.length > 0) i2vParams.duration = submittedDuration;
+                const resolutions = getCurrentResolutions(submittedModel);
+                if (resolutions.length > 0) i2vParams.resolution = submittedResolution;
+                i2vParams.advanced = submittedAdvanced;
+                return kie.generateI2V(i2vParams);
             }
 
-            const params = { model: selectedModel, onRequestId };
+            const params = { model: submittedModel, onRequestId };
 
             if (prompt) params.prompt = prompt;
 
@@ -1030,62 +1165,72 @@ export function VideoStudio() {
             if (isExtendMode) {
                 params.request_id = lastGenerationId;
             } else {
-                params.aspect_ratio = selectedAr;
+                params.aspect_ratio = submittedAr;
             }
 
-            const durations = getCurrentDurations(selectedModel);
-            if (durations.length > 0) params.duration = selectedDuration;
+            const durations = getCurrentDurations(submittedModel);
+            if (durations.length > 0) params.duration = submittedDuration;
 
-            const resolutions = getCurrentResolutions(selectedModel);
-            if (resolutions.length > 0) params.resolution = selectedResolution;
+            const resolutions = getCurrentResolutions(submittedModel);
+            if (resolutions.length > 0) params.resolution = submittedResolution;
+            params.advanced = submittedAdvanced;
 
-            if (selectedQuality) params.quality = selectedQuality;
-            if (selectedMode) params.mode = selectedMode;
+            return kie.generateVideo(params);
+        };
 
-            const res = await kie.generateVideo(params);
-
+        const onDone = (res) => {
             console.log('[VideoStudio] Full response:', res);
-
-            if (res && res.url) {
-                if (capturedRequestId) removePendingJob(capturedRequestId);
-                const genId = res.id || capturedRequestId || Date.now().toString();
-                // Store request_id for seedance-v2.0 models (enables Extend button)
-                if (selectedModel === 'seedance-v2.0-t2v' || selectedModel === 'seedance-v2.0-i2v') {
-                    lastGenerationId = genId;
-                    lastGenerationModel = selectedModel;
-                } else {
-                    lastGenerationId = null;
-                    lastGenerationModel = null;
-                }
-
-                addToHistory({
-                    id: genId,
-                    url: res.url,
-                    prompt,
-                    model: selectedModel,
-                    aspect_ratio: selectedAr,
-                    duration: selectedDuration,
-                    timestamp: new Date().toISOString()
-                });
-                showVideoInCanvas(res.url, selectedModel);
-            } else {
+            if (!res?.url) {
                 console.error('[VideoStudio] No video URL in response:', res);
-                throw new Error('No video URL returned by API');
+                flashBanner('Video failed: no video URL returned by API');
+                return;
             }
+            const genId = res.id || queuedId || Date.now().toString();
+            // Keep the request id for seedance-v2.0 models so the Extend button works
+            const keepForExtend = !submittedV2V && (submittedModel === 'seedance-v2.0-t2v' || submittedModel === 'seedance-v2.0-i2v');
+            lastGenerationId = keepForExtend ? genId : null;
+            lastGenerationModel = keepForExtend ? submittedModel : null;
+
+            addToHistory(submittedV2V
+                ? { id: genId, url: res.url, prompt: '', model: submittedModel, timestamp: new Date().toISOString() }
+                : { id: genId, url: res.url, prompt, model: submittedModel, aspect_ratio: submittedAr, duration: submittedDuration, timestamp: new Date().toISOString() });
+
+            // Open the finished video unless more jobs are still running (then it waits in History).
+            if (jobsInFlight === 0) showVideoInCanvas(res.url, submittedModel);
+            else flashBanner('Video ready — open it from History on the right');
+        };
+
+        submitting = true;
+        generateBtn.disabled = true;
+        generateBtn.innerHTML = `<span class="animate-spin inline-block mr-2 text-black">◌</span> Queuing...`;
+
+        let failed = false;
+        jobsInFlight++;
+        try {
+            await startGenerationJob(
+                { studioType: 'video', historyMeta, maxAttempts: 900, interval: 2000 },
+                runJob,
+                {
+                    onDone: (res) => { jobsInFlight = Math.max(0, jobsInFlight - 1); onDone(res); },
+                    onFail: (e) => {
+                        jobsInFlight = Math.max(0, jobsInFlight - 1);
+                        console.error('[VideoStudio] Generation failed:', e);
+                        flashBanner(`Video failed: ${e.message.slice(0, 80)}`);
+                    },
+                }
+            );
         } catch (e) {
-            hadError = true;
-            if (capturedRequestId) removePendingJob(capturedRequestId);
-            console.error(e);
-            // Restore hero so the page doesn't look broken after a failed generation
-            hero.classList.remove('opacity-0', 'scale-95', '-translate-y-10', 'pointer-events-none');
+            failed = true;
+            jobsInFlight = Math.max(0, jobsInFlight - 1);
+            console.error('[VideoStudio] Could not queue generation:', e);
             generateBtn.innerHTML = `Error: ${e.message.slice(0, 60)}`;
             setTimeout(() => {
                 generateBtn.innerHTML = `Generate ✨`;
             }, 4000);
         } finally {
+            submitting = false;
             generateBtn.disabled = false;
-            // Only reset the label on success; the catch timeout handles the error case
-            if (!hadError) generateBtn.innerHTML = `Generate ✨`;
+            if (!failed) generateBtn.innerHTML = `Generate ✨`;
         }
     };
 

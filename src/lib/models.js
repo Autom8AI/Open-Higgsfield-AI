@@ -1,3 +1,4 @@
+import { getVideoSpec } from './videoSpecs.js';
 // Auto-generated from data/models.json
 export const t2iModels = [
   {
@@ -607,4 +608,27 @@ for (const list of [t2iModels, i2iModels, t2vModels, i2vModels, v2vModels, lipsy
     if (!m.name) m.name = m.label || m.id;
     if (!m.description) m.description = m.blurb || '';
   }
+}
+
+// ── Normalisation (keep when regenerating from data/models.json) ─────────────
+// The studios read `name`, `durations` and `inputs.*.default`; the registry
+// only has `label`, `hasDuration` and `resolutionDefault`. Fill those in, and
+// derive the image-to-video list from video models that accept images.
+
+for (const m of [...t2iModels, ...i2iModels, ...t2vModels, ...lipsyncModels]) {
+  if (!m.name) m.name = m.label || m.id;
+}
+for (const m of t2vModels) {
+  const spec = getVideoSpec(m.id);
+  if (spec?.durations && !m.durations) m.durations = spec.durations;
+  else if (m.hasDuration && !m.durations) m.durations = [5, 10];
+  m.inputs = m.inputs || {};
+  if (m.resolutionDefault && !m.inputs.resolution) m.inputs.resolution = { default: m.resolutionDefault };
+  if (spec?.durationDefault && !m.inputs.duration) m.inputs.duration = { default: spec.durationDefault };
+}
+// Image-to-video: every video model that takes images (same objects, shared ids).
+i2vModels.push(...t2vModels.filter(m => m.images || getVideoSpec(m.id)?.imageOnly));
+// Text-to-video list drops models that cannot run without an image.
+for (let i = t2vModels.length - 1; i >= 0; i--) {
+  if (t2vModels[i].images?.required || getVideoSpec(t2vModels[i].id)?.imageOnly) t2vModels.splice(i, 1);
 }

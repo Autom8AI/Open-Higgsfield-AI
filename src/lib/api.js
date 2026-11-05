@@ -1,3 +1,4 @@
+import { buildVideoParams } from './videoSpecs.js';
 // Bridge to the content-factory Netlify function backend (same account,
 // credits and Airtable library). Activated by logging in; falls back to the
 // direct kie.ai client when no session is active.
@@ -61,16 +62,22 @@ function checkSession() {
     return request('/credits').then(j => { sessionActive = true; return true; }).catch(() => { sessionActive = false; return false; });
 }
 
-async function pollBackend(taskId, maxAttempts = 300, interval = 2000) {    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+async function pollBackend(taskId, maxAttempts = 300, interval = 2000) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         await new Promise(resolve => setTimeout(resolve, interval));
+        let json;
         try {
-            const json = await request(`/status?taskId=${encodeURIComponent(taskId)}`);
-            const state = String(json.state || '').toLowerCase();
-            if (state === 'success' || state === 'completed') return { resultUrls: json.urls || [], ...json };
-            if (state === 'fail' || state === 'FAILED') throw new Error(json.error || 'Generation failed');
+            json = await request(`/status?taskId=${encodeURIComponent(taskId)}`);
         } catch (error) {
-            if (attempt === maxAttempts) throw error;
+            // Network errors and 5xx/429 are transient: keep polling. Anything else
+            // (auth, a failed task reported as { error }) is final.
+            const transient = !error.status || error.status >= 500 || error.status === 429;
+            if (!transient || attempt === maxAttempts) throw error;
+            continue;
         }
+        const state = String(json.state || '').toLowerCase();
+        if (state === 'success' || state === 'completed') return { resultUrls: json.urls || [], ...json };
+        if (state === 'fail' || state === 'failed' || state === 'error') throw new Error(json.error || 'Generation failed');
     }
     throw new Error('Generation timed out after polling.');
 }
@@ -83,7 +90,7 @@ async function create(payload, params) {
     const { taskId } = json;
     if (!taskId) return json;
     if (params.onRequestId) params.onRequestId(`cf:${taskId}`);
-    const result = await pollBackend(taskId);
+    const result = await pollBackend(taskId, params.maxAttempts || 300, params.interval || 2000);
     const url = result.resultUrls?.[0] || result.url;
     return { ...result, url };
 }
@@ -141,26 +148,26 @@ export async function generateI2I(params) {
     return generateImage(params);
 }
 
-function videoPayload(params, kind) {
+function videoPayload(params) {
+    // Registry ids (e.g. "bytedance/seedance-2") go straight through; old ids are mapped.
+    const modelId = String(params.model).includes('/') ? params.model : mapVideoId(params.model);
+    const built = buildVideoParams({ ...params, model: modelId });
+    if (built.firstFrame) built.params.first_frame_url = built.firstFrame;
     return {
-        modelId: mapVideoId(params.model),
+        modelId,
         prompt: params.prompt,
-        images: params.image_url ? [params.image_url] : [],
+        images: built.images,
         videos: [],
-        params: {
-            ...(params.aspect_ratio ? { aspect_ratio: params.aspect_ratio } : {}),
-            ...(params.resolution ? { resolution: params.resolution } : {}),
-            ...(params.duration ? { duration: params.duration } : {})
-        }
+        params: built.params
     };
 }
 
 export async function generateVideo(params) {
-    return create(videoPayload(params, 't2v'), params);
+    return create(videoPayload(params), { maxAttempts: 900, ...params });
 }
 
 export async function generateI2V(params) {
-    return create(videoPayload(params, 'i2v'), params);
+    return create(videoPayload(params), { maxAttempts: 900, ...params });
 }
 
 export async function processLipSync(params) {

@@ -1,5 +1,6 @@
 import { getModelById, getVideoModelById, getI2IModelById, getI2VModelById } from './models.js';
 import * as cf from './api.js';
+import { buildVideoParams } from './videoSpecs.js';
 
 const KIE_BASE = 'https://api.kie.ai';
 
@@ -186,6 +187,11 @@ export class KieClient {
         const registry = kind === 'i2v' ? getI2VModelById(id) : getVideoModelById(id);
         const info = { ...registry } || { id, endpoint: id };
 
+        // Registry models (ids like "bytedance/seedance-2") are kie market slugs.
+        if (String(id).includes('/')) {
+            return { ...info, family: 'jobs', model: id, registry: true, imageParam: registry?.images?.param || (id.includes('happyhorse') ? 'reference_image' : null) };
+        }
+
         if (id.includes('veo')) {
             const isFast = id.includes('fast');
             let model = 'veo3';
@@ -216,6 +222,14 @@ export class KieClient {
     }
 
     _videoInput(params, settings) {
+        if (settings.registry) {
+            const built = buildVideoParams(params);
+            const input = { ...built.params };
+            if (params.prompt) input.prompt = params.prompt;
+            if (built.firstFrame) input.first_frame_url = built.firstFrame;
+            if (built.images.length && settings.imageParam) input[settings.imageParam] = built.images;
+            return input;
+        }
         const input = {};
         if (params.prompt) input.prompt = params.prompt;
         if (params.aspect_ratio) input.aspect_ratio = params.aspect_ratio;

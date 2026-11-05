@@ -8,7 +8,7 @@ import { ENHANCE_TAGS, QUICK_PROMPTS } from '../lib/promptUtils.js';
 import { sortByPriceDesc, loadPricing, modelPrice } from '../lib/modelSort.js';
 import { AuthModal } from './AuthModal.js';
 import { createUploadPicker } from './UploadPicker.js';
-import { savePendingJob, removePendingJob, getPendingJobs } from '../lib/pendingJobs.js';
+import { savePendingJob, removePendingJob, getPendingJobs, startGenerationJob } from '../lib/pendingJobs.js';
 
 function createInlineInstructions(type) {
     const el = document.createElement('div');
@@ -211,6 +211,7 @@ export function ImageStudio() {
     }
 
     const generateBtn = document.createElement('button');
+    let submitting = false;
     generateBtn.className = 'bg-primary text-black px-6 md:px-8 py-3 md:py-3.5 rounded-xl md:rounded-[1.5rem] font-black text-sm md:text-base hover:shadow-glow hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2.5 w-full sm:w-auto shadow-lg';
     generateBtn.setAttribute('data-tooltip', 'Generate AI image from prompt');
     generateBtn.innerHTML = `Generate ✨`;
@@ -892,6 +893,15 @@ export function ImageStudio() {
         };
     };
 
+    // --- Helper: Short error banner (used by background jobs) ---
+    const flashBanner = (text) => {
+        const el = document.createElement('div');
+        el.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-[#111] border border-red-500/40 text-white text-sm px-5 py-3 rounded-2xl shadow-xl';
+        el.textContent = text;
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 5000);
+    };
+
     // --- Helper: Add to history ---
     const addToHistory = (entry) => {
         generationHistory.unshift(entry);
@@ -1049,6 +1059,7 @@ export function ImageStudio() {
     // 5. GENERATION LOGIC
     // ==========================================
     generateBtn.onclick = async () => {
+        if (submitting) return;
         const prompt = textarea.value.trim();
         if (imageMode) {
             if (uploadedImageUrls.length === 0) {
@@ -1069,78 +1080,67 @@ export function ImageStudio() {
             return;
         }
 
-        hero.classList.add('opacity-0', 'scale-95', '-translate-y-10', 'pointer-events-none');
-        generateBtn.disabled = true;
-        generateBtn.innerHTML = `<span class="animate-spin inline-block mr-2 text-black">◌</span> Generating...`;
-
-        let hadError = false;
-        let capturedRequestId = null;
+        // Prompt, uploads and hero stay on screen. The button is only busy while the
+        // job is being queued; polling continues in the background so another job can start.
         const historyMeta = { prompt, model: selectedModel, aspect_ratio: selectedAr };
+        const qualityLabel = document.getElementById('quality-btn-label')?.textContent;
+        const qualityField = getCurrentQualityField(selectedModel);
 
+        const buildParams = (queueRequest) => {
+            const params = imageMode
+                ? { model: selectedModel, images_list: uploadedImageUrls, image_url: uploadedImageUrls[0], aspect_ratio: selectedAr }
+                : { model: selectedModel, prompt, aspect_ratio: selectedAr };
+            if (imageMode && prompt) params.prompt = prompt;
+            if (qualityField && qualityLabel) params[qualityField] = qualityLabel;
+            params.onRequestId = queueRequest;
+            return params;
+        };
+
+        submitting = true;
+        generateBtn.disabled = true;
+        generateBtn.innerHTML = `<span class="animate-spin inline-block mr-2 text-black">◌</span> Queuing...`;
+
+        let failed = false;
         try {
-            let res;
-            const qualityLabel = document.getElementById('quality-btn-label')?.textContent;
-            if (imageMode) {
-                const genParams = {
-                    model: selectedModel,
-                    images_list: uploadedImageUrls,
-                    image_url: uploadedImageUrls[0], // backward compat for single-image models
-                    aspect_ratio: selectedAr,
-                    onRequestId: (rid) => {
-                        capturedRequestId = rid;
-                        savePendingJob({ requestId: rid, studioType: 'image', historyMeta, maxAttempts: 60, interval: 2000, submittedAt: Date.now() });
-                    }
-                };
-                if (prompt) genParams.prompt = prompt;
-                const qualityField = getCurrentQualityField(selectedModel);
-                if (qualityField && qualityLabel) genParams[qualityField] = qualityLabel;
-                res = await kie.generateI2I(genParams);
-            } else {
-                const genParams = {
-                    model: selectedModel,
-                    prompt,
-                    aspect_ratio: selectedAr,
-                    onRequestId: (rid) => {
-                        capturedRequestId = rid;
-                        savePendingJob({ requestId: rid, studioType: 'image', historyMeta, maxAttempts: 60, interval: 2000, submittedAt: Date.now() });
-                    }
-                };
-                const qualityField = getCurrentQualityField(selectedModel);
-                if (qualityField && qualityLabel) genParams[qualityField] = qualityLabel;
-                res = await kie.generateImage(genParams);
-            }
-
-            console.log('[ImageStudio] Full response:', res);
-
-            if (res && res.url) {
-                if (capturedRequestId) removePendingJob(capturedRequestId);
-                addToHistory({
-                    id: res.id || capturedRequestId || Date.now().toString(),
-                    url: res.url,
-                    prompt: prompt,
-                    model: selectedModel,
-                    aspect_ratio: selectedAr,
-                    timestamp: new Date().toISOString()
-                });
-                showImageInCanvas(res.url);
-            } else {
-                console.error('[ImageStudio] No image URL in response:', res);
-                throw new Error('No image URL returned by API');
-            }
+            await startGenerationJob(
+                { studioType: 'image', historyMeta, maxAttempts: 60, interval: 2000 },
+                (queueRequest) => {
+                    const params = buildParams(queueRequest);
+                    return imageMode ? kie.generateI2I(params) : kie.generateImage(params);
+                },
+                {
+                    onDone: (res) => {
+                        if (!res?.url) {
+                            console.error('[ImageStudio] No image URL in response:', res);
+                            flashBanner('Image failed: no image URL returned by API');
+                            return;
+                        }
+                        addToHistory({
+                            id: res.id || Date.now().toString(),
+                            url: res.url,
+                            prompt: historyMeta.prompt,
+                            model: historyMeta.model,
+                            aspect_ratio: historyMeta.aspect_ratio,
+                            timestamp: new Date().toISOString(),
+                        });
+                    },
+                    onFail: (e) => {
+                        console.error('[ImageStudio] Generation failed:', e);
+                        flashBanner(`Image failed: ${e.message.slice(0, 80)}`);
+                    },
+                }
+            );
         } catch (e) {
-            hadError = true;
-            if (capturedRequestId) removePendingJob(capturedRequestId);
-            console.error(e);
-            // Restore hero so the page doesn't look broken after a failed generation
-            hero.classList.remove('opacity-0', 'scale-95', '-translate-y-10', 'pointer-events-none');
+            failed = true;
+            console.error('[ImageStudio] Could not queue generation:', e);
             generateBtn.innerHTML = `Error: ${e.message.slice(0, 60)}`;
             setTimeout(() => {
                 generateBtn.innerHTML = `Generate ✨`;
             }, 4000);
         } finally {
+            submitting = false;
             generateBtn.disabled = false;
-            // Only reset the label on success; the catch timeout handles the error case
-            if (!hadError) generateBtn.innerHTML = `Generate ✨`;
+            if (!failed) generateBtn.innerHTML = `Generate ✨`;
         }
     };
 

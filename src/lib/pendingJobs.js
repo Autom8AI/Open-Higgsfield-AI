@@ -31,3 +31,42 @@ function getAllPendingJobs() {
         return [];
     }
 }
+
+// Runs a generation without holding the caller's UI. `run(queueRequest)` must call
+// `queueRequest(requestId)` once the provider has accepted the job. The returned
+// promise resolves at that point, so the studio button can reset while polling
+// continues in the background. `onDone` / `onFail` fire when polling finishes.
+// Rejects only if the job never got queued.
+export function startGenerationJob({ studioType, historyMeta, maxAttempts = 300, interval = 2000 }, run, { onDone, onFail } = {}) {
+    return new Promise((resolveQueued, rejectQueued) => {
+        let queued = false;
+        let requestId = null;
+
+        const queueRequest = (rid) => {
+            if (queued) return;
+            queued = true;
+            requestId = rid || null;
+            if (requestId) savePendingJob({ requestId, studioType, historyMeta, maxAttempts, interval, submittedAt: Date.now() });
+            resolveQueued(requestId);
+        };
+
+        const finish = () => {
+            if (requestId) removePendingJob(requestId);
+        };
+
+        Promise.resolve()
+            .then(() => run(queueRequest))
+            .then(
+                (result) => {
+                    queueRequest(null);
+                    finish();
+                    onDone?.(result);
+                },
+                (error) => {
+                    finish();
+                    if (queued) onFail?.(error);
+                    else rejectQueued(error);
+                }
+            );
+    });
+}

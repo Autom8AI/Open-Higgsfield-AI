@@ -14,6 +14,7 @@ import { startGenerationJob, getPendingJobs, removePendingJob } from '../lib/pen
 import { loadPricing, priceInfo, priceLabel, sortByPriceDesc } from '../lib/modelSort.js';
 import { createQueueHistory, costMeta } from '../lib/studioQueue.js';
 import { renderResultGrid } from '../lib/resultCards.js';
+import { CAMERA_PRESETS } from '../lib/presets.js';
 
 const PLATFORMS = [
     { id: 'reels', label: 'Reels / TikTok / Shorts', hint: 'Vertical 9:16', prefer: ['9:16'] },
@@ -58,6 +59,7 @@ export function FactoryStudio() {
         duration: 5,
         resolution: '',
         count: 3,
+        camera: CAMERA_PRESETS[0], // 'Auto' = each scene picks its own camera
         drafts: [], // [{ id, angle, prompt, status: 'writing' | 'ready' | 'error' }]
         writing: false,
     };
@@ -170,6 +172,13 @@ export function FactoryStudio() {
     modelField.f.className = 'col-span-2';
     const durationField = selectField('Length');
     const resolutionField = selectField('Resolution');
+    const cameraField = selectField('Camera');
+    CAMERA_PRESETS.forEach(c => {
+        const o = document.createElement('option');
+        o.value = c.id; o.textContent = c.id === 'none' ? 'Varied per scene' : c.label;
+        cameraField.sel.appendChild(o);
+    });
+    cameraField.sel.onchange = () => { state.camera = CAMERA_PRESETS.find(c => c.id === cameraField.sel.value) || CAMERA_PRESETS[0]; };
 
     const countField = document.createElement('div');
     countField.appendChild(label('Variations'));
@@ -266,7 +275,7 @@ export function FactoryStudio() {
 
     const flashBanner = (text, isError = true) => {
         const el = document.createElement('div');
-        el.className = `fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-[#111] border ${isError ? 'border-red-500/40' : 'border-primary/40'} text-white text-sm px-5 py-3 rounded-2xl shadow-xl`;
+        el.className = `fixed top-20 left-1/2 pointer-events-none -translate-x-1/2 z-[200] bg-[#111] border ${isError ? 'border-red-500/40' : 'border-primary/40'} text-white text-sm px-5 py-3 rounded-2xl shadow-xl`;
         el.textContent = text;
         document.body.appendChild(el);
         setTimeout(() => el.remove(), 5000);
@@ -286,6 +295,7 @@ export function FactoryStudio() {
         `Platform: ${state.platform.label} (${pickAspect().aspect}), a single continuous ${state.duration}-second clip.`,
         `Look: ${state.style.label} - ${state.style.text}.`,
         `This is variation ${draftIdx + 1} of ${state.count}. Angle: ${ANGLES[draftIdx % ANGLES.length]}`,
+        ...(state.camera.text ? [`Camera for every scene: ${state.camera.text}`] : []),
         'No on-screen text, captions or logos. Describe the scene, subject, camera movement and lighting.',
     ].join('\n');
 

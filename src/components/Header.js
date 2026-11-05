@@ -31,9 +31,9 @@ export function Header(navigate) {
 
     const menu = document.createElement('nav');
     menu.className = 'hidden lg:flex items-center gap-6 text-[13px] font-bold text-secondary';
-    const items = ['Library', 'Image', 'Video', 'Factory', 'Remix', 'Lip Sync', 'Cinema Studio'];
+    const items = ['Library', 'Image', 'Video', 'Factory', 'Remix', 'Characters', 'Lip Sync', 'Cinema Studio'];
 
-    const pageForItem = { 'Library': 'library', 'Image': 'image', 'Video': 'video', 'Factory': 'factory', 'Remix': 'remix', 'Lip Sync': 'lipsync', 'Cinema Studio': 'cinema' };
+    const pageForItem = { 'Library': 'library', 'Image': 'image', 'Video': 'video', 'Factory': 'factory', 'Remix': 'remix', 'Characters': 'characters', 'Lip Sync': 'lipsync', 'Cinema Studio': 'cinema' };
     const links = {};
 
     const activate = (name) => {

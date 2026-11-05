@@ -13,6 +13,8 @@ import { createQueueHistory, costMeta } from '../lib/studioQueue.js';
 import { renderResultGrid } from '../lib/resultCards.js';
 import { createUploadPicker } from './UploadPicker.js';
 import { AuthModal } from './AuthModal.js';
+import { RESTYLE_PRESETS, restyleInstruction } from '../lib/presets.js';
+import { createCharacterButton } from '../lib/characters.js';
 
 const modelObj = (id) => ({ id, name: REMIX_LABELS[id] || id });
 
@@ -58,7 +60,7 @@ export function RemixStudio() {
     const modeBlock = document.createElement('div');
     modeBlock.appendChild(label('What do you want to do?'));
     const modeRow = document.createElement('div');
-    modeRow.className = 'grid grid-cols-1 sm:grid-cols-2 gap-3';
+    modeRow.className = 'grid grid-cols-1 sm:grid-cols-3 gap-3';
     modeBlock.appendChild(modeRow);
     card.appendChild(modeBlock);
 
@@ -177,7 +179,11 @@ export function RemixStudio() {
         onSelect: ({ urls, url }) => { imageUrls = urls || [url]; updateGenerate(); paintImageHint(); },
         onClear: () => { imageUrls = []; updateGenerate(); paintImageHint(); },
     });
-    imageRow.append(picker.trigger, imageHint);
+    const characterBtn = createCharacterButton({
+        label: 'Use a saved character',
+        onPick: (c) => picker.setImages(c.portraits),
+    });
+    imageRow.append(picker.trigger, characterBtn.element, imageHint);
     imageBlock.appendChild(imageRow);
     container.appendChild(picker.panel);
     card.appendChild(imageBlock);
@@ -198,10 +204,29 @@ export function RemixStudio() {
     prompt.rows = 3;
     prompt.className = 'w-full bg-black/30 border border-white/10 rounded-2xl px-4 py-3 text-base text-white placeholder:text-muted focus:outline-none focus:border-primary/50 resize-none';
     prompt.oninput = updateGenerate;
-    promptBlock.append(promptTitle, prompt);
+    // One-tap looks for Object Swap / Edit: fill the prompt with a restyle instruction.
+    const restyleRow = document.createElement('div');
+    restyleRow.className = 'flex flex-wrap gap-2 mt-3';
+    RESTYLE_PRESETS.forEach(p => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'px-3 py-1.5 rounded-xl text-[11px] font-bold bg-white/5 text-white/80 border border-white/10 hover:border-primary/40 transition-all';
+        b.textContent = p.label;
+        b.title = restyleInstruction(p);
+        b.onclick = () => { prompt.value = restyleInstruction(p); updateGenerate(); };
+        restyleRow.appendChild(b);
+    });
+    const restyleLabel = document.createElement('div');
+    restyleLabel.className = 'text-[10px] font-bold text-secondary uppercase tracking-widest mt-4';
+    restyleLabel.textContent = 'Or restyle the whole video';
+    promptBlock.append(promptTitle, prompt, restyleLabel, restyleRow);
     card.appendChild(promptBlock);
 
     function paintPrompt() {
+        promptBlock.style.display = spec().noPrompt ? 'none' : '';
+        const showRestyle = mode.id === 'edit';
+        restyleLabel.style.display = showRestyle ? '' : 'none';
+        restyleRow.style.display = showRestyle ? '' : 'none';
         const req = spec().promptRequired;
         promptTitle.textContent = req ? '3 · What should change?' : '3 · Describe it (optional)';
         prompt.placeholder = mode.id === 'motion'
@@ -258,7 +283,7 @@ export function RemixStudio() {
                 if ((extra[f.key] ?? f.default) === opt.value) o.selected = true;
                 sel.appendChild(o);
             });
-            sel.onchange = () => { extra[f.key] = sel.value; };
+            sel.onchange = () => { extra[f.key] = sel.value; updateGenerate(); };
         });
     }
     modelField.sel.onchange = () => { modelId = modelField.sel.value; applyModel(); };
@@ -305,6 +330,7 @@ export function RemixStudio() {
         if (!video) return 'Add a source video';
         if (imageUrls.length < spec().images.min) return mode.id === 'motion' ? 'Add a reference image' : 'Add a reference image';
         if (spec().promptRequired && !prompt.value.trim()) return 'Describe what should change';
+        if ((extra.character_orientation ?? '') === 'image' && video.duration > 10.05) return 'With "Reference image" orientation the clip must be 10s or shorter';
         return '';
     }
     function updateGenerate() {
@@ -336,7 +362,7 @@ export function RemixStudio() {
 
     const flashBanner = (text, isError = true) => {
         const el = document.createElement('div');
-        el.className = `fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-[#111] border ${isError ? 'border-red-500/40' : 'border-primary/40'} text-white text-sm px-5 py-3 rounded-2xl shadow-xl`;
+        el.className = `fixed top-20 left-1/2 pointer-events-none -translate-x-1/2 z-[200] bg-[#111] border ${isError ? 'border-red-500/40' : 'border-primary/40'} text-white text-sm px-5 py-3 rounded-2xl shadow-xl`;
         el.textContent = text;
         document.body.appendChild(el);
         setTimeout(() => el.remove(), 5000);
@@ -354,7 +380,7 @@ export function RemixStudio() {
         const model = modelObj(modelId);
         const cost = costMeta(model, { duration: snap.video.duration, resolution: snap.resolution });
         const historyMeta = {
-            prompt: snap.prompt || (mode.id === 'motion' ? 'Motion transfer' : 'Edit'),
+            prompt: snap.prompt || ({ motion: 'Motion transfer', replace: 'Character swap', edit: 'Edit' }[mode.id]),
             model: snap.model, modelName: REMIX_LABELS[snap.model], resolution: snap.resolution,
             duration: Math.round(snap.video.duration * 10) / 10, ...cost,
         };
@@ -363,6 +389,7 @@ export function RemixStudio() {
         video = null;
         imageUrls = [];
         picker.reset();
+        characterBtn.reset();
         prompt.value = '';
         paintVideo('');
         paintImageHint();

@@ -7,38 +7,35 @@ const app = document.querySelector('#app');
 let contentArea;
 let booted = false;
 
-// Router
+// Router. Pages load on demand; a navigation token makes sure only the most
+// recent page is shown even if an older page's code finishes loading later.
+const PAGES = {
+  video: () => import('./components/VideoStudio.js').then(m => m.VideoStudio),
+  factory: () => import('./components/FactoryStudio.js').then(m => m.FactoryStudio),
+  remix: () => import('./components/RemixStudio.js').then(m => m.RemixStudio),
+  characters: () => import('./components/CharactersPage.js').then(m => m.CharactersPage),
+  library: () => import('./components/LibraryPage.js').then(m => m.LibraryPage),
+  cinema: () => import('./components/CinemaStudio.js').then(m => m.CinemaStudio),
+  lipsync: () => import('./components/LipSyncStudio.js').then(m => m.LipSyncStudio),
+};
+let navToken = 0;
+
 function navigate(page) {
   if (!contentArea) return;
+  const token = ++navToken;
   contentArea.innerHTML = '';
 
   if (page === 'image') {
     contentArea.appendChild(ImageStudio());
-  } else if (page === 'video') {
-    import('./components/VideoStudio.js').then(({ VideoStudio }) => {
-      contentArea.appendChild(VideoStudio());
-    });
-  } else if (page === 'factory') {
-    import('./components/FactoryStudio.js').then(({ FactoryStudio }) => {
-      contentArea.appendChild(FactoryStudio());
-    });
-  } else if (page === 'remix') {
-    import('./components/RemixStudio.js').then(({ RemixStudio }) => {
-      contentArea.appendChild(RemixStudio());
-    });
-  } else if (page === 'library') {
-    import('./components/LibraryPage.js').then(({ LibraryPage }) => {
-      contentArea.appendChild(LibraryPage());
-    });
-  } else if (page === 'cinema') {
-    import('./components/CinemaStudio.js').then(({ CinemaStudio }) => {
-      contentArea.appendChild(CinemaStudio());
-    });
-  } else if (page === 'lipsync') {
-    import('./components/LipSyncStudio.js').then(({ LipSyncStudio }) => {
-      contentArea.appendChild(LipSyncStudio());
-    });
+    return;
   }
+  const load = PAGES[page];
+  if (!load) return;
+  load().then((Page) => {
+    if (token !== navToken) return; // a newer navigation happened meanwhile
+    contentArea.innerHTML = '';
+    contentArea.appendChild(Page());
+  });
 }
 
 // Event Listener for Navigation

@@ -6,6 +6,8 @@ import { savePendingJob, removePendingJob, getPendingJobs, startGenerationJob } 
 import { sortByPriceDesc, loadPricing, priceChipHtml, costText } from '../lib/modelSort.js';
 import { createQueueHistory, pendingThumbHtml, creditBadgeHtml, costMeta } from '../lib/studioQueue.js';
 import { advancedFieldsFor } from '../lib/videoSpecs.js';
+import { CAMERA_PRESETS } from '../lib/presets.js';
+import { createCharacterButton } from '../lib/characters.js';
 
 export function VideoStudio() {
     const container = document.createElement('div');
@@ -29,6 +31,7 @@ export function VideoStudio() {
     let v2vMode = false;   // true = video-to-video tools mode
     let uploadedVideoUrl = null;
     let advancedOpen = false;
+    let selectedCamera = CAMERA_PRESETS[0];
     let advancedValues = {}; // per-model values for the Advanced panel, reset on model change
 
     const getCurrentModels = () => v2vMode ? v2vModels : (imageMode ? i2vModels : t2vModels);
@@ -318,6 +321,24 @@ export function VideoStudio() {
     controlsLeft.appendChild(resolutionBtn);
     controlsLeft.appendChild(qualityBtn);
     
+    const cameraBtn = createControlBtn(`
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="opacity-60 text-secondary"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+    `, 'Camera: Auto', 'v-camera-btn', 'Choose a camera move');
+    controlsLeft.appendChild(cameraBtn);
+
+    // Saved character: use its first photo as the image, as a look reference where supported.
+    const characterBtn = createCharacterButton({
+        onPick: (c) => {
+            const p = c.portraits[0];
+            picker.setImage(p.url, p.thumb);
+            if (advancedFieldsFor(selectedModel, true).some(f => f.key === 'image_role')) {
+                advancedValues.image_role = 'reference';
+                renderAdvanced();
+            }
+        },
+    });
+    controlsLeft.appendChild(characterBtn.element);
+
     // Advanced options toggle button
     const advancedBtn = createControlBtn(`
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="opacity-60 text-secondary"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 001.82-.33 1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-1.82.33A1.65 1.65 0 0019.4 9a1.65 1.65 0 00-1.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
@@ -788,6 +809,27 @@ export function VideoStudio() {
             });
             dropdown.appendChild(list);
 
+        } else if (type === 'camera') {
+            dropdown.classList.add('max-w-[240px]');
+            dropdown.innerHTML = `<div class="text-[10px] font-bold text-secondary uppercase tracking-widest px-3 py-2 border-b border-white/5 mb-2">Camera move</div>`;
+            const list = document.createElement('div');
+            list.className = 'flex flex-col gap-1 max-h-[50vh] overflow-y-auto custom-scrollbar pr-1';
+            CAMERA_PRESETS.forEach(c => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between p-3 hover:bg-white/5 rounded-2xl cursor-pointer transition-all group';
+                item.title = c.text || 'Let the model choose the camera';
+                item.innerHTML = `<span class="text-xs font-bold text-white opacity-80 group-hover:opacity-100"></span>${selectedCamera.id === c.id ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff2d2d" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}`;
+                item.firstElementChild.textContent = c.label;
+                item.onclick = (e) => {
+                    e.stopPropagation();
+                    selectedCamera = c;
+                    document.getElementById('v-camera-btn-label').textContent = `Camera: ${c.label}`;
+                    closeDropdown();
+                };
+                list.appendChild(item);
+            });
+            dropdown.appendChild(list);
+
         } else if (type === 'mode') {
             dropdown.classList.add('max-w-[200px]');
             dropdown.innerHTML = `<div class="text-[10px] font-bold text-secondary uppercase tracking-widest px-3 py-2 border-b border-white/5 mb-2">Mode</div>`;
@@ -843,6 +885,7 @@ export function VideoStudio() {
     resolutionBtn.onclick = toggleDropdown('resolution', resolutionBtn);
     qualityBtn.onclick = toggleDropdown('quality', qualityBtn);
     modeBtn.onclick = toggleDropdown('mode', modeBtn);
+    cameraBtn.onclick = toggleDropdown('camera', cameraBtn);
 
     window.addEventListener('click', closeDropdown);
     container.appendChild(dropdown);
@@ -933,7 +976,7 @@ export function VideoStudio() {
     // --- Helper: Short error banner (used by background jobs) ---
     const flashBanner = (text, isError = true) => {
         const el = document.createElement('div');
-        el.className = `fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-[#111] border ${isError ? 'border-red-500/40' : 'border-primary/40'} text-white text-sm px-5 py-3 rounded-2xl shadow-xl`;
+        el.className = `fixed top-20 left-1/2 pointer-events-none -translate-x-1/2 z-[200] bg-[#111] border ${isError ? 'border-red-500/40' : 'border-primary/40'} text-white text-sm px-5 py-3 rounded-2xl shadow-xl`;
         el.textContent = text;
         document.body.appendChild(el);
         setTimeout(() => el.remove(), 5000);
@@ -1038,9 +1081,11 @@ export function VideoStudio() {
         if (!apiKey && !localStorage.getItem('cf_backend')) return; // can't poll without key; jobs remain for next time
 
         const banner = document.createElement('div');
-        banner.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-[#111] border border-white/10 text-white text-sm px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3';
+        banner.className = 'fixed top-20 left-1/2 -translate-x-1/2 z-[200] bg-[#111] border border-white/10 text-white text-sm px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 pointer-events-none';
         banner.innerHTML = `<span class="animate-spin text-primary">◌</span> <span class="banner-text">Resuming ${pending.length} pending generation${pending.length > 1 ? 's' : ''}…</span>`;
         document.body.appendChild(banner);
+        // Brief notice only; the Queued cards in History show progress from here on.
+        setTimeout(() => banner.remove(), 4000);
 
         let remaining = pending.length;
         pending.forEach(async (job) => {
@@ -1148,6 +1193,7 @@ export function VideoStudio() {
     // back to the first text-to-video model because there is no image any more.
     const resetInputs = () => {
         picker.reset();
+        characterBtn.reset();
         uploadedImageUrl = null;
         if (v2vMode) {
             uploadedVideoUrl = null;
@@ -1216,6 +1262,8 @@ export function VideoStudio() {
         const submittedDuration = selectedDuration;
         const submittedResolution = selectedResolution;
         const submittedAdvanced = { ...advancedValues };
+        // The chosen camera move is added to what the model receives (History keeps the typed prompt).
+        const promptForModel = [prompt, selectedCamera.text].filter(Boolean).join(' ');
         const submittedImageMode = imageMode;
         const submittedV2V = v2vMode;
         const submittedImageUrl = uploadedImageUrl;
@@ -1248,7 +1296,7 @@ export function VideoStudio() {
                     image_url: submittedImageUrl,
                     onRequestId,
                 };
-                if (prompt) i2vParams.prompt = prompt;
+                if (promptForModel) i2vParams.prompt = promptForModel;
                 i2vParams.aspect_ratio = submittedAr;
                 const durations = getCurrentDurations(submittedModel);
                 if (durations.length > 0) i2vParams.duration = submittedDuration;
@@ -1261,7 +1309,7 @@ export function VideoStudio() {
 
             const params = { model: submittedModel, onRequestId };
 
-            if (prompt) params.prompt = prompt;
+            if (promptForModel) params.prompt = promptForModel;
 
             // Extend mode: pass stored request_id, skip aspect_ratio
             if (isExtendMode) {

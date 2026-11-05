@@ -403,5 +403,12 @@ export function createUploadPicker({ anchorContainer, onSelect, onClear, maxImag
         fireOnSelect();
     };
 
-    return { trigger, panel, reset, setMaxImages, getSelectedUrls, setImage };
+    // Select several existing images at once (e.g. a saved character's portraits).
+    const setImages = (items) => {
+        selectedEntries = items.slice(0, maxImages).map(i => ({ url: i.url, thumbnail: i.thumb || i.url }));
+        updateTrigger();
+        fireOnSelect();
+    };
+
+    return { trigger, panel, reset, setMaxImages, getSelectedUrls, setImage, setImages };
 }

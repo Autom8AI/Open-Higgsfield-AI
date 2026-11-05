@@ -7,6 +7,7 @@ import {
 import { ENHANCE_TAGS, QUICK_PROMPTS } from '../lib/promptUtils.js';
 import { sortByPriceDesc, loadPricing, priceChipHtml, costText } from '../lib/modelSort.js';
 import { createQueueHistory, pendingThumbHtml, creditBadgeHtml, costMeta } from '../lib/studioQueue.js';
+import { createCharacterButton } from '../lib/characters.js';
 import { AuthModal } from './AuthModal.js';
 import { createUploadPicker } from './UploadPicker.js';
 import { savePendingJob, removePendingJob, getPendingJobs, startGenerationJob } from '../lib/pendingJobs.js';
@@ -197,6 +198,15 @@ export function ImageStudio() {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="opacity-60 text-secondary"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 001.82-.33 1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-1.82.33A1.65 1.65 0 0019.4 9a1.65 1.65 0 00-1.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
     `, 'Advanced', 'advanced-btn', 'Show advanced options');
     controlsLeft.appendChild(advancedBtn);
+
+    // Saved character: its photos become the reference images (switches to image-to-image).
+    const characterBtn = createCharacterButton({
+        onPick: (c) => {
+            picker.setMaxImages(getMaxImagesForI2IModel(imageMode ? selectedModel : i2iModels[0].id));
+            picker.setImages(c.portraits);
+        },
+    });
+    controlsLeft.appendChild(characterBtn.element);
     
     // Quick Tools toggle button
     const toolsBtn = createControlBtn(`
@@ -912,7 +922,7 @@ export function ImageStudio() {
     // --- Helper: Short error banner (used by background jobs) ---
     const flashBanner = (text, isError = true) => {
         const el = document.createElement('div');
-        el.className = `fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-[#111] border ${isError ? 'border-red-500/40' : 'border-primary/40'} text-white text-sm px-5 py-3 rounded-2xl shadow-xl`;
+        el.className = `fixed top-20 left-1/2 pointer-events-none -translate-x-1/2 z-[200] bg-[#111] border ${isError ? 'border-red-500/40' : 'border-primary/40'} text-white text-sm px-5 py-3 rounded-2xl shadow-xl`;
         el.textContent = text;
         document.body.appendChild(el);
         setTimeout(() => el.remove(), 5000);
@@ -1011,9 +1021,11 @@ export function ImageStudio() {
         if (!apiKey && !localStorage.getItem('cf_backend')) return; // can't poll without key; jobs remain for next time
 
         const banner = document.createElement('div');
-        banner.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-[#111] border border-white/10 text-white text-sm px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3';
+        banner.className = 'fixed top-20 left-1/2 -translate-x-1/2 z-[200] bg-[#111] border border-white/10 text-white text-sm px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 pointer-events-none';
         banner.innerHTML = `<span class="animate-spin text-primary">◌</span> <span class="banner-text">Resuming ${pending.length} pending generation${pending.length > 1 ? 's' : ''}…</span>`;
         document.body.appendChild(banner);
+        // Brief notice only; the Queued cards in History show progress from here on.
+        setTimeout(() => banner.remove(), 4000);
 
         let remaining = pending.length;
         pending.forEach(async (job) => {
@@ -1098,6 +1110,7 @@ export function ImageStudio() {
     // reference-image models fall back to the first text-to-image model.
     const resetInputs = () => {
         picker.reset();
+        characterBtn.reset();
         uploadedImageUrls = [];
         if (imageMode) {
             imageMode = false;

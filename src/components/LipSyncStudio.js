@@ -556,7 +556,7 @@ export function LipSyncStudio() {
 
     const flashBanner = (text, isError = true) => {
         const el = document.createElement('div');
-        el.className = `fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-[#111] border ${isError ? 'border-red-500/40' : 'border-primary/40'} text-white text-sm px-5 py-3 rounded-2xl shadow-xl`;
+        el.className = `fixed top-20 left-1/2 pointer-events-none -translate-x-1/2 z-[200] bg-[#111] border ${isError ? 'border-red-500/40' : 'border-primary/40'} text-white text-sm px-5 py-3 rounded-2xl shadow-xl`;
         el.textContent = text;
         document.body.appendChild(el);
         setTimeout(() => el.remove(), 5000);
@@ -635,9 +635,11 @@ export function LipSyncStudio() {
         const cfLogged = !!localStorage.getItem('cf_backend');
         if (!apiKey && !localStorage.getItem('cf_backend')) return;
         const banner = document.createElement('div');
-        banner.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-[#111] border border-white/10 text-white text-sm px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3';
+        banner.className = 'fixed top-20 left-1/2 -translate-x-1/2 z-[200] bg-[#111] border border-white/10 text-white text-sm px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 pointer-events-none';
         banner.innerHTML = `<span class="animate-spin text-primary">◌</span> <span class="banner-text">Resuming ${pending.length} pending generation${pending.length > 1 ? 's' : ''}…</span>`;
         document.body.appendChild(banner);
+        // Brief notice only; the Queued cards in History show progress from here on.
+        setTimeout(() => banner.remove(), 4000);
         let remaining = pending.length;
         pending.forEach(async (job) => {
             const tempId = queueHistory.addPending({ ...job.historyMeta });

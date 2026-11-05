@@ -599,7 +599,7 @@ export function CinemaStudio() {
 
         const flash = (text, isError = true) => {
             const el = document.createElement('div');
-            el.className = `fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-[#111] border ${isError ? 'border-red-500/40' : 'border-[#ff2d2d]/40'} text-white text-sm px-5 py-3 rounded-2xl shadow-xl`;
+            el.className = `fixed top-20 left-1/2 pointer-events-none -translate-x-1/2 z-[200] bg-[#111] border ${isError ? 'border-red-500/40' : 'border-[#ff2d2d]/40'} text-white text-sm px-5 py-3 rounded-2xl shadow-xl`;
             el.textContent = text;
             document.body.appendChild(el);
             setTimeout(() => el.remove(), 5000);

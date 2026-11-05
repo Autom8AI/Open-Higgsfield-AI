@@ -291,6 +291,7 @@ exports.handler = guard('create', async function (event) {
   if (hosted.length && model.images) input[model.images.param] = model.images.single ? hosted[0] : hosted
   if (videos.length && model.videos) input[model.videos.param] = model.videos.single ? videos[0] : videos
   if (model.resolutionParam && input.resolution) { input[model.resolutionParam] = input.resolution; delete input.resolution }
+  if (model.noPrompt) delete input.prompt
   const base = process.env.URL || process.env.DEPLOY_PRIME_URL
   const cb = base ? `${base}/.netlify/functions/callback` : undefined
   const taskId = await createTask(modelId, input, cb, keys.kie)

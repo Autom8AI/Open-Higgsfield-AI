@@ -1,6 +1,7 @@
 const { json, denied, guard } = require('./_kie')
 const { requireFalKey, submit } = require('./_fal')
 const { listRecords } = require('./_airtable')
+const { requireAccount, accountProviderKeys } = require('./_auth')
 
 const TABLE = 'tblsT27uHkU21Csq0'
 
@@ -51,7 +52,11 @@ exports.handler = guard('avatar-train', async function (event) {
   if (event.httpMethod === 'OPTIONS') return json(200, { ok: true })
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' })
   const gate = denied(event); if (gate) return gate
-  const env = requireFalKey(json); if (env) return env
+  // Training is paid: only signed-in accounts, billed to their own fal.ai key.
+  const auth = await requireAccount(event, { requireProviderSetup: false })
+  if (auth.error) return json(auth.error.statusCode, auth.error.body)
+  const falAccountKey = accountProviderKeys(auth.account).fal
+  if (!falAccountKey) return json(403, { error: 'FAL_KEY_REQUIRED' })
 
   const body = JSON.parse(event.body || '{}')
   if (!body.avatarId) return json(400, { error: 'avatarId is required.' })
@@ -74,7 +79,7 @@ exports.handler = guard('avatar-train', async function (event) {
     images_data_url: imagesDataUrl,
     trigger_word: triggerWord,
     is_style: false,
-  })
+  }, undefined, falAccountKey)
 
   return json(200, {
     ok: true,

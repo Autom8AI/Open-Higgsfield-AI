@@ -70,6 +70,10 @@ exports.handler = guard('library', async function (event) {
   if (event.httpMethod === 'OPTIONS') return json(200, { ok: true })
   const gate = denied(event); if (gate) return gate
 
+  // Signed-in accounts only: listing, deleting and syncing all need a session.
+  const auth = await requireAccount(event, { requireProviderSetup: false })
+  if (auth.error) return json(auth.error.statusCode, auth.error.body)
+
   if (event.httpMethod === 'DELETE') {
     const id = (event.queryStringParameters || {}).id
     if (!id) return json(400, { error: 'id required' })
@@ -93,8 +97,7 @@ exports.handler = guard('library', async function (event) {
     })
   }
 
-  const auth = await requireAccount(event, { requireProviderSetup: false })
-  if (!auth.error) {
+  {
     const keys = accountProviderKeys(auth.account)
     const parsedRecords = records.map((record) => ({ record, params: recordParams(record) }))
 

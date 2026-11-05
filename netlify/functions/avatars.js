@@ -41,6 +41,10 @@ exports.handler = guard('avatars', async function (event) {
   if (event.httpMethod === 'OPTIONS') return json(200, { ok: true })
   const gate = denied(event); if (gate) return gate
 
+  // Signed-in accounts only (listing, editing and deleting characters).
+  const session = await requireAccount(event, { requireProviderSetup: false })
+  if (session.error) return json(session.error.statusCode, session.error.body)
+
   const q = event.queryStringParameters || {}
 
   if (event.httpMethod === 'GET') {

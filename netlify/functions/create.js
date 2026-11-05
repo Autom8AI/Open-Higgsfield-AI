@@ -60,7 +60,7 @@ function isPublicUrl(value) {
   return /^https?:\/\//i.test(String(value || ''))
 }
 
-async function storeQueued({ model, prompt, taskId, input, credits, accountId }) {
+async function storeQueued({ model, prompt, taskId, input, credits, accountId, estimated = 0 }) {
   try {
     await createRecord(GENERATIONS, {
       Name: `${model.id} · queued`,
@@ -68,7 +68,7 @@ async function storeQueued({ model, prompt, taskId, input, credits, accountId })
       Model: model.id,
       Prompt: prompt,
       'Source URL': taskId,
-      Params: JSON.stringify({ ...input, _model: model.id, _kind: model.kind, _prompt: prompt, _taskId: taskId, _credits: credits || 0, _accountId: accountId }),
+      Params: JSON.stringify({ ...input, _model: model.id, _kind: model.kind, _prompt: prompt, _taskId: taskId, _credits: credits || 0, _estimated: estimated || 0, _accountId: accountId }),
       Status: 'Draft',
       Created: new Date().toISOString(),
     })
@@ -288,7 +288,8 @@ exports.handler = guard('create', async function (event) {
   const base = process.env.URL || process.env.DEPLOY_PRIME_URL
   const cb = base ? `${base}/.netlify/functions/callback` : undefined
   const taskId = await createTask(modelId, input, cb, keys.kie)
-  const stored = await storeQueued({ model, prompt, taskId, input, credits: Number(model.credits || 0), accountId: auth.account.id })
+  const estimated = Math.max(0, Math.min(100000, Number(body.estimatedCredits) || 0))
+  const stored = await storeQueued({ model, prompt, taskId, input, credits: Number(model.credits || 0), accountId: auth.account.id, estimated })
   await trackUsage(auth.account, 'kie', Number(model.credits || 0))
   return json(200, { ok: true, taskId, kind: model.kind, model: modelId, prompt, params: input, provider: 'kie', ...stored })
 })

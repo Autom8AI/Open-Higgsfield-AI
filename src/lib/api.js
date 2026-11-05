@@ -85,7 +85,7 @@ async function pollBackend(taskId, maxAttempts = 300, interval = 2000) {
 async function create(payload, params) {
     const json = await request('/create', {
         method: 'POST',
-        body: JSON.stringify(payload)
+        body: JSON.stringify(params.estimatedCredits ? { ...payload, estimatedCredits: params.estimatedCredits } : payload)
     });
     const { taskId } = json;
     if (!taskId) return json;

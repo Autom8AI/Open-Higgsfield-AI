@@ -3,7 +3,8 @@ import { lipsyncModels, imageLipSyncModels, videoLipSyncModels, getLipSyncModelB
 import { AuthModal } from './AuthModal.js';
 import { createUploadPicker } from './UploadPicker.js';
 import { savePendingJob, removePendingJob, getPendingJobs, startGenerationJob } from '../lib/pendingJobs.js';
-import { sortByPriceDesc, loadPricing, modelPrice } from '../lib/modelSort.js';
+import { sortByPriceDesc, loadPricing, priceChipHtml, costText, estimateCredits } from '../lib/modelSort.js';
+import { createQueueHistory, pendingThumbHtml, creditBadgeHtml, costMeta } from '../lib/studioQueue.js';
 
 export function LipSyncStudio() {
     const container = document.createElement('div');
@@ -311,14 +312,24 @@ export function LipSyncStudio() {
 
     // Generate button
     const generateBtn = document.createElement('button');
-    let submitting = false;
     generateBtn.id = 'ls-generate-btn';
     generateBtn.type = 'button';
     generateBtn.className = 'ml-auto px-6 py-2.5 bg-primary text-black font-black text-sm rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-glow disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100';
     generateBtn.textContent = 'Generate ✨';
 
+    // Cost of the next run beside Generate ("≈ N cr", or a per-second rate when the length depends on the audio).
+    const costEl = document.createElement('span');
+    costEl.className = 'ml-auto text-[11px] font-bold text-secondary whitespace-nowrap';
+    generateBtn.classList.remove('ml-auto');
+    const refreshCost = () => {
+        const model = getCurrentModel();
+        costEl.textContent = model ? costText(model, { resolution: selectedResolution }) : '';
+    };
+    loadPricing().then(refreshCost);
+
     bottomRow.appendChild(modelBtn);
     bottomRow.appendChild(resolutionBtn);
+    bottomRow.appendChild(costEl);
     bottomRow.appendChild(generateBtn);
     bar.appendChild(bottomRow);
 
@@ -333,6 +344,7 @@ export function LipSyncStudio() {
     dropdown.id = 'ls-dropdown';
 
     const closeDropdown = (e) => {
+        refreshCost();
         if (!e || (!dropdown.contains(e.target) && !e.target.closest('[id^="ls-"]'))) {
             dropdown.classList.add('hidden');
             dropdownOpen = null;
@@ -347,7 +359,7 @@ export function LipSyncStudio() {
                 const item = document.createElement('button');
                 item.type = 'button';
                 item.className = `w-full text-left px-4 py-2.5 rounded-xl text-sm transition-all hover:bg-white/10 ${m.id === selectedModel ? 'text-primary font-bold bg-primary/5' : 'text-white font-medium'}`;
-                item.innerHTML = `<div class="flex items-center justify-between gap-2"><span>${m.name}</span>${modelPrice(m) != null ? `<span class="text-[10px] font-bold text-muted">${modelPrice(m)} cr</span>` : ''}</div><div class="text-xs text-muted mt-0.5">${m.description?.slice(0, 60)}...</div>`;
+                item.innerHTML = `<div class="flex items-center justify-between gap-2"><span>${m.name}</span>${priceChipHtml(m, selectedResolution)}</div><div class="text-xs text-muted mt-0.5">${m.description?.slice(0, 60)}...</div>`;
                 item.onclick = () => {
                     selectedModel = m.id;
                     document.getElementById('ls-model-btn-label').textContent = m.name;
@@ -542,29 +554,38 @@ export function LipSyncStudio() {
         };
     };
 
-    const flashBanner = (text) => {
+    const flashBanner = (text, isError = true) => {
         const el = document.createElement('div');
-        el.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-[#111] border border-red-500/40 text-white text-sm px-5 py-3 rounded-2xl shadow-xl';
+        el.className = `fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-[#111] border ${isError ? 'border-red-500/40' : 'border-primary/40'} text-white text-sm px-5 py-3 rounded-2xl shadow-xl`;
         el.textContent = text;
         document.body.appendChild(el);
         setTimeout(() => el.remove(), 5000);
     };
 
-    const addToHistory = (entry) => {
-        generationHistory.unshift(entry);
-        localStorage.setItem('lipsync_history', JSON.stringify(generationHistory.slice(0, 30)));
+    const revealHistory = () => {
         historySidebar.classList.remove('translate-x-full', 'opacity-0');
         historySidebar.classList.add('translate-x-0', 'opacity-100');
-        renderHistory();
     };
+    const queueHistory = createQueueHistory({
+        history: generationHistory, storageKey: 'lipsync_history', limit: 30,
+        render: () => renderHistory(), reveal: revealHistory,
+    });
+    const addToHistory = (entry) => queueHistory.resolve(null, entry);
 
     const renderHistory = () => {
         historyList.innerHTML = '';
         generationHistory.forEach((entry, idx) => {
             const thumb = document.createElement('div');
-            thumb.className = `relative group/thumb cursor-pointer rounded-xl overflow-hidden border-2 transition-all duration-300 ${idx === 0 ? 'border-primary shadow-glow' : 'border-white/10 hover:border-white/30'}`;
+            thumb.className = `relative group/thumb ${entry.pending ? '' : 'cursor-pointer'} rounded-xl overflow-hidden border-2 transition-all duration-300 ${idx === 0 ? 'border-primary shadow-glow' : 'border-white/10 hover:border-white/30'}`;
+            if (entry.pending) {
+                thumb.title = entry.prompt ? `Generating: ${entry.prompt.slice(0, 80)}` : 'Generating…';
+                thumb.innerHTML = pendingThumbHtml(entry);
+                historyList.appendChild(thumb);
+                return;
+            }
             thumb.innerHTML = `
                 <video src="${entry.url}" preload="metadata" muted class="w-full aspect-square object-cover"></video>
+                ${creditBadgeHtml(entry)}
                 <div class="absolute inset-0 bg-black/60 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center">
                     <button class="hist-download p-1.5 bg-primary rounded-lg text-black hover:scale-110 transition-transform" title="Download">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
@@ -619,13 +640,15 @@ export function LipSyncStudio() {
         document.body.appendChild(banner);
         let remaining = pending.length;
         pending.forEach(async (job) => {
+            const tempId = queueHistory.addPending({ ...job.historyMeta });
             const elapsedAttempts = Math.floor((Date.now() - job.submittedAt) / job.interval);
             const attemptsLeft = Math.max(1, job.maxAttempts - elapsedAttempts);
             try {
                 const result = await kie.pollForResult(job.requestId, apiKey, attemptsLeft, job.interval);
                 const url = result.outputs?.[0] || result.url || result.output?.url;
-                if (url) addToHistory({ id: job.requestId, url, ...job.historyMeta, timestamp: new Date().toISOString() });
-            } catch (e) { console.warn('[LipSyncStudio] Pending job failed:', job.requestId, e.message); }
+                if (url) queueHistory.resolve(tempId, { id: job.requestId, url, ...job.historyMeta, timestamp: new Date().toISOString() });
+                else queueHistory.fail(tempId);
+            } catch (e) { queueHistory.fail(tempId); console.warn('[LipSyncStudio] Pending job failed:', job.requestId, e.message); }
             finally {
                 removePendingJob(job.requestId);
                 remaining--;
@@ -646,7 +669,12 @@ export function LipSyncStudio() {
         }
     };
 
-    regenerateBtn.onclick = () => generateBtn.click();
+    regenerateBtn.onclick = () => {
+        // Uploads are cleared after every Generate, so a regenerate needs fresh inputs.
+        newBtn.onclick();
+        const entry = generationHistory.find(e => e.url === resultVideo.src);
+        if (entry?.prompt) textarea.value = entry.prompt;
+    };
 
     newBtn.onclick = () => {
         canvas.classList.add('opacity-0', 'pointer-events-none', 'translate-y-10', 'scale-95');
@@ -670,11 +698,25 @@ export function LipSyncStudio() {
         textarea.focus();
     };
 
+    // Clear uploads after a submit (model and resolution stay).
+    const resetInputs = () => {
+        imagePicker.reset();
+        uploadedImageUrl = null;
+        uploadedVideoUrl = null;
+        uploadedAudioUrl = null;
+        showVideoIcon();
+        showAudioIcon();
+        mediaStatusLabel.textContent = inputMode === 'image' ? 'No image' : 'No video';
+        mediaStatusLabel.className = 'text-muted';
+        audioStatusLabel.textContent = 'No audio';
+        audioStatusLabel.className = 'text-muted';
+        refreshCost();
+    };
+
     // ==========================================
     // 8. GENERATION LOGIC
     // ==========================================
     generateBtn.onclick = async () => {
-        if (submitting) return;
         const model = getCurrentModel();
         const prompt = textarea.value.trim();
 
@@ -696,11 +738,20 @@ export function LipSyncStudio() {
         const cfLogged = !!localStorage.getItem('cf_backend');
         if (!apiKey && !cfLogged) { AuthModal(() => generateBtn.click()); return; }
 
-        // Prompt, uploads and hero stay on screen. The button is only busy while the
-        // job is being queued; polling continues in the background so another job can start.
+        // Snapshot this run, then clear the form so the next one can start immediately.
         const submittedModel = selectedModel;
-        const historyMeta = { prompt, model: submittedModel };
+        const submittedMode = inputMode;
+        const submittedImage = uploadedImageUrl;
+        const submittedVideo = uploadedVideoUrl;
+        const submittedAudio = uploadedAudioUrl;
+        const submittedResolution = selectedResolution;
+        const cost = model ? costMeta(model, { resolution: submittedResolution }) : {};
+        const historyMeta = { prompt, model: submittedModel, ...cost };
         let queuedId = null;
+
+        const tempId = queueHistory.addPending(historyMeta);
+        textarea.value = '';
+        resetInputs();
 
         const runJob = (queueRequest) => {
             const onRequestId = (rid) => {
@@ -710,60 +761,53 @@ export function LipSyncStudio() {
 
             const lipsyncParams = {
                 model: submittedModel,
-                audio_url: uploadedAudioUrl,
+                audio_url: submittedAudio,
                 onRequestId
             };
 
-            if (inputMode === 'image') {
-                lipsyncParams.image_url = uploadedImageUrl;
+            if (submittedMode === 'image') {
+                lipsyncParams.image_url = submittedImage;
             } else {
-                lipsyncParams.video_url = uploadedVideoUrl;
+                lipsyncParams.video_url = submittedVideo;
             }
 
             if (prompt && model?.hasPrompt) lipsyncParams.prompt = prompt;
 
             const resolutions = getResolutionsForLipSyncModel(submittedModel);
-            if (resolutions.length > 0) lipsyncParams.resolution = selectedResolution;
+            if (resolutions.length > 0) lipsyncParams.resolution = submittedResolution;
 
             if (model?.hasSeed) lipsyncParams.seed = -1;
+            if (cost.credits) lipsyncParams.estimatedCredits = cost.credits;
 
             return kie.processLipSync(lipsyncParams);
         };
 
-        submitting = true;
-        generateBtn.disabled = true;
-        generateBtn.innerHTML = `<span class="animate-spin inline-block mr-2 text-black">◌</span> Queuing...`;
-
-        let failed = false;
-        try {
-            await startGenerationJob(
-                { studioType: 'lipsync', historyMeta, maxAttempts: 900, interval: 2000 },
-                runJob,
-                {
-                    onDone: (res) => {
-                        console.log('[LipSyncStudio] Response:', res);
-                        if (!res?.url) {
-                            flashBanner('Lip sync failed: no video URL returned by API');
-                            return;
-                        }
-                        addToHistory({ id: res.id || queuedId || Date.now().toString(), url: res.url, prompt, model: submittedModel, timestamp: new Date().toISOString() });
-                    },
-                    onFail: (e) => {
-                        console.error('[LipSyncStudio] Generation failed:', e);
-                        flashBanner(`Lip sync failed: ${e.message.slice(0, 80)}`);
-                    },
-                }
-            );
-        } catch (e) {
-            failed = true;
+        // Not awaited: the studio stays usable while the job is queued and polled.
+        startGenerationJob(
+            { studioType: 'lipsync', historyMeta, maxAttempts: 900, interval: 2000 },
+            runJob,
+            {
+                onDone: (res) => {
+                    console.log('[LipSyncStudio] Response:', res);
+                    if (!res?.url) {
+                        queueHistory.fail(tempId);
+                        flashBanner('Lip sync failed: no video URL returned by API');
+                        return;
+                    }
+                    queueHistory.resolve(tempId, { id: res.id || queuedId || Date.now().toString(), url: res.url, ...historyMeta, timestamp: new Date().toISOString() });
+                    flashBanner('Lip sync ready — open it from History on the right', false);
+                },
+                onFail: (e) => {
+                    console.error('[LipSyncStudio] Generation failed:', e);
+                    queueHistory.fail(tempId);
+                    flashBanner(`Lip sync failed: ${e.message.slice(0, 80)}`);
+                },
+            }
+        ).catch((e) => {
             console.error('[LipSyncStudio] Could not queue generation:', e);
-            generateBtn.innerHTML = `Error: ${e.message.slice(0, 60)}`;
-            setTimeout(() => { generateBtn.innerHTML = `Generate ✨`; }, 4000);
-        } finally {
-            submitting = false;
-            generateBtn.disabled = false;
-            if (!failed) generateBtn.innerHTML = `Generate ✨`;
-        }
+            queueHistory.fail(tempId);
+            flashBanner(`Could not start lip sync: ${e.message.slice(0, 80)}`);
+        });
     };
 
     return container;

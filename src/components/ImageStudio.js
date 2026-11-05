@@ -5,7 +5,8 @@ import {
     getMaxImagesForI2IModel
 } from '../lib/models.js';
 import { ENHANCE_TAGS, QUICK_PROMPTS } from '../lib/promptUtils.js';
-import { sortByPriceDesc, loadPricing, modelPrice } from '../lib/modelSort.js';
+import { sortByPriceDesc, loadPricing, priceChipHtml, estimateCredits } from '../lib/modelSort.js';
+import { createQueueHistory, pendingThumbHtml, creditBadgeHtml, costMeta } from '../lib/studioQueue.js';
 import { AuthModal } from './AuthModal.js';
 import { createUploadPicker } from './UploadPicker.js';
 import { savePendingJob, removePendingJob, getPendingJobs, startGenerationJob } from '../lib/pendingJobs.js';
@@ -211,13 +212,28 @@ export function ImageStudio() {
     }
 
     const generateBtn = document.createElement('button');
-    let submitting = false;
     generateBtn.className = 'bg-primary text-black px-6 md:px-8 py-3 md:py-3.5 rounded-xl md:rounded-[1.5rem] font-black text-sm md:text-base hover:shadow-glow hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2.5 w-full sm:w-auto shadow-lg';
     generateBtn.setAttribute('data-tooltip', 'Generate AI image from prompt');
     generateBtn.innerHTML = `Generate ✨`;
 
+    // Estimated cost of the next run, shown beside Generate.
+    const costEl = document.createElement('span');
+    costEl.className = 'hidden sm:inline text-[11px] font-bold text-secondary whitespace-nowrap self-center';
+    const currentResolution = () => (getCurrentQualityField(selectedModel) ? document.getElementById('quality-btn-label')?.textContent : '');
+    const refreshCost = () => {
+        const model = getCurrentModels().find(m => m.id === selectedModel);
+        const credits = model ? estimateCredits(model, { resolution: currentResolution() }) : null;
+        costEl.textContent = credits != null ? `≈ ${credits} cr` : '';
+    };
+    loadPricing().then(refreshCost);
+
+    const generateGroup = document.createElement('div');
+    generateGroup.className = 'flex items-center gap-3 w-full sm:w-auto';
+    generateGroup.appendChild(costEl);
+    generateGroup.appendChild(generateBtn);
+
     bottomRow.appendChild(controlsLeft);
-    bottomRow.appendChild(generateBtn);
+    bottomRow.appendChild(generateGroup);
     bar.appendChild(bottomRow);
     promptWrapper.appendChild(bar);
     container.appendChild(promptWrapper);
@@ -678,7 +694,7 @@ export function ImageStudio() {
                              </div>
                         </div>
                         <div class="flex items-center gap-2">
-                            ${modelPrice(m) != null ? `<span class="text-[10px] font-bold text-muted">${modelPrice(m)} cr</span>` : ''}
+                            ${priceChipHtml(m, document.getElementById('quality-btn-label')?.textContent)}
                             ${selectedModel === m.id ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff2d2d" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
                         </div>
                     `;
@@ -787,6 +803,7 @@ export function ImageStudio() {
     };
 
     const closeDropdown = () => {
+        refreshCost();
         dropdown.classList.add('opacity-0', 'pointer-events-none');
         dropdown.classList.remove('opacity-100', 'pointer-events-auto');
         dropdownOpen = null;
@@ -894,36 +911,41 @@ export function ImageStudio() {
     };
 
     // --- Helper: Short error banner (used by background jobs) ---
-    const flashBanner = (text) => {
+    const flashBanner = (text, isError = true) => {
         const el = document.createElement('div');
-        el.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-[#111] border border-red-500/40 text-white text-sm px-5 py-3 rounded-2xl shadow-xl';
+        el.className = `fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-[#111] border ${isError ? 'border-red-500/40' : 'border-primary/40'} text-white text-sm px-5 py-3 rounded-2xl shadow-xl`;
         el.textContent = text;
         document.body.appendChild(el);
         setTimeout(() => el.remove(), 5000);
     };
 
-    // --- Helper: Add to history ---
-    const addToHistory = (entry) => {
-        generationHistory.unshift(entry);
-
-        // Save to localStorage
-        localStorage.setItem('kie_history', JSON.stringify(generationHistory.slice(0, 50)));
-
-        // Show sidebar
+    // --- History (pending cards are inserted the moment Generate is clicked) ---
+    const revealHistory = () => {
         historySidebar.classList.remove('translate-x-full', 'opacity-0');
         historySidebar.classList.add('translate-x-0', 'opacity-100');
-
-        renderHistory();
     };
+    const queueHistory = createQueueHistory({
+        history: generationHistory, storageKey: 'kie_history', limit: 50,
+        render: () => renderHistory(), reveal: revealHistory,
+    });
+    const addToHistory = (entry) => queueHistory.resolve(null, entry);
 
     const renderHistory = () => {
         historyList.innerHTML = '';
         generationHistory.forEach((entry, idx) => {
             const thumb = document.createElement('div');
-            thumb.className = `relative group/thumb cursor-pointer rounded-xl overflow-hidden border-2 transition-all duration-300 ${idx === 0 ? 'border-primary shadow-glow' : 'border-white/10 hover:border-white/30'}`;
+            thumb.className = `relative group/thumb ${entry.pending ? '' : 'cursor-pointer'} rounded-xl overflow-hidden border-2 transition-all duration-300 ${idx === 0 ? 'border-primary shadow-glow' : 'border-white/10 hover:border-white/30'}`;
+
+            if (entry.pending) {
+                thumb.title = entry.prompt ? `Generating: ${entry.prompt.slice(0, 80)}` : 'Generating…';
+                thumb.innerHTML = pendingThumbHtml(entry);
+                historyList.appendChild(thumb);
+                return;
+            }
 
             thumb.innerHTML = `
                 <img src="${entry.url}" alt="${entry.prompt?.substring(0, 30) || 'Generated'}" class="w-full aspect-square object-cover">
+                ${creditBadgeHtml(entry)}
                 <div class="absolute inset-0 bg-black/60 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center gap-1">
                     <button class="hist-download p-1.5 bg-primary rounded-lg text-black hover:scale-110 transition-transform" title="Download">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
@@ -996,15 +1018,17 @@ export function ImageStudio() {
 
         let remaining = pending.length;
         pending.forEach(async (job) => {
+            const tempId = queueHistory.addPending({ ...job.historyMeta });
             const elapsedAttempts = Math.floor((Date.now() - job.submittedAt) / job.interval);
             const attemptsLeft = Math.max(1, job.maxAttempts - elapsedAttempts);
             try {
                 const result = await kie.pollForResult(job.requestId, apiKey, attemptsLeft, job.interval);
                 const url = result.outputs?.[0] || result.url || result.output?.url;
                 if (url) {
-                    addToHistory({ id: job.requestId, url, ...job.historyMeta, timestamp: new Date().toISOString() });
-                }
+                    queueHistory.resolve(tempId, { id: job.requestId, url, ...job.historyMeta, timestamp: new Date().toISOString() });
+                } else queueHistory.fail(tempId);
             } catch (e) {
+                queueHistory.fail(tempId);
                 console.warn('[ImageStudio] Pending job failed on resume:', job.requestId, e.message);
             } finally {
                 removePendingJob(job.requestId);
@@ -1025,6 +1049,22 @@ export function ImageStudio() {
     };
 
     regenerateBtn.onclick = () => {
+        // Inputs are cleared after every Generate, so restore the viewed image's settings first.
+        const entry = generationHistory.find(e => e.url === resultImg.src);
+        newPromptBtn.onclick();
+        if (entry) {
+            textarea.value = entry.prompt || '';
+            const m = t2iModels.find(x => x.id === entry.model);
+            if (m) {
+                selectedModel = m.id; selectedModelName = m.name;
+                document.getElementById('model-btn-label').textContent = selectedModelName;
+                if (entry.aspect_ratio && getAspectRatiosForModel(m.id).includes(entry.aspect_ratio)) {
+                    selectedAr = entry.aspect_ratio;
+                    document.getElementById('ar-btn-label').textContent = selectedAr;
+                }
+                refreshCost();
+            }
+        }
         generateBtn.click();
     };
 
@@ -1055,11 +1095,31 @@ export function ImageStudio() {
         textarea.focus();
     };
 
+    // Clear the prompt/reference after a submit. The chosen model and settings stay;
+    // reference-image models fall back to the first text-to-image model.
+    const resetInputs = () => {
+        picker.reset();
+        uploadedImageUrls = [];
+        if (imageMode) {
+            imageMode = false;
+            selectedModel = t2iModels[0].id;
+            selectedModelName = t2iModels[0].name;
+            selectedAr = getAspectRatiosForModel(selectedModel)[0];
+            document.getElementById('model-btn-label').textContent = selectedModelName;
+            document.getElementById('ar-btn-label').textContent = selectedAr;
+            const resolutions = getResolutionsForModel(selectedModel);
+            qualityBtn.style.display = resolutions.length > 0 ? 'flex' : 'none';
+            if (resolutions.length > 0) document.getElementById('quality-btn-label').textContent = resolutions[0];
+            picker.setMaxImages(1);
+        }
+        textarea.placeholder = 'Describe the image you want to create';
+        refreshCost();
+    };
+
     // ==========================================
     // 5. GENERATION LOGIC
     // ==========================================
     generateBtn.onclick = async () => {
-        if (submitting) return;
         const prompt = textarea.value.trim();
         if (imageMode) {
             if (uploadedImageUrls.length === 0) {
@@ -1080,68 +1140,67 @@ export function ImageStudio() {
             return;
         }
 
-        // Prompt, uploads and hero stay on screen. The button is only busy while the
-        // job is being queued; polling continues in the background so another job can start.
-        const historyMeta = { prompt, model: selectedModel, aspect_ratio: selectedAr };
+        // Snapshot this run, then clear the form so the next prompt can start immediately.
+        const submittedModel = selectedModel;
+        const submittedAr = selectedAr;
+        const submittedImages = uploadedImageUrls.slice();
+        const submittedImageMode = imageMode;
         const qualityLabel = document.getElementById('quality-btn-label')?.textContent;
         const qualityField = getCurrentQualityField(selectedModel);
+        const model = getCurrentModels().find(m => m.id === submittedModel);
+        const cost = model ? costMeta(model, { resolution: qualityField ? qualityLabel : '' }) : {};
+        const historyMeta = { prompt, model: submittedModel, aspect_ratio: submittedAr, ...cost };
+
+        const tempId = queueHistory.addPending(historyMeta);
+        textarea.value = '';
+        textarea.style.height = 'auto';
+        resetInputs();
 
         const buildParams = (queueRequest) => {
-            const params = imageMode
-                ? { model: selectedModel, images_list: uploadedImageUrls, image_url: uploadedImageUrls[0], aspect_ratio: selectedAr }
-                : { model: selectedModel, prompt, aspect_ratio: selectedAr };
-            if (imageMode && prompt) params.prompt = prompt;
+            const params = submittedImageMode
+                ? { model: submittedModel, images_list: submittedImages, image_url: submittedImages[0], aspect_ratio: submittedAr }
+                : { model: submittedModel, prompt, aspect_ratio: submittedAr };
+            if (submittedImageMode && prompt) params.prompt = prompt;
             if (qualityField && qualityLabel) params[qualityField] = qualityLabel;
+            if (cost.credits) params.estimatedCredits = cost.credits;
             params.onRequestId = queueRequest;
             return params;
         };
 
-        submitting = true;
-        generateBtn.disabled = true;
-        generateBtn.innerHTML = `<span class="animate-spin inline-block mr-2 text-black">◌</span> Queuing...`;
-
-        let failed = false;
-        try {
-            await startGenerationJob(
-                { studioType: 'image', historyMeta, maxAttempts: 60, interval: 2000 },
-                (queueRequest) => {
-                    const params = buildParams(queueRequest);
-                    return imageMode ? kie.generateI2I(params) : kie.generateImage(params);
+        // Not awaited: the studio stays usable while the job is queued and polled.
+        startGenerationJob(
+            { studioType: 'image', historyMeta, maxAttempts: 60, interval: 2000 },
+            (queueRequest) => {
+                const params = buildParams(queueRequest);
+                return submittedImageMode ? kie.generateI2I(params) : kie.generateImage(params);
+            },
+            {
+                onDone: (res) => {
+                    if (!res?.url) {
+                        console.error('[ImageStudio] No image URL in response:', res);
+                        queueHistory.fail(tempId);
+                        flashBanner('Image failed: no image URL returned by API');
+                        return;
+                    }
+                    queueHistory.resolve(tempId, {
+                        id: res.id || Date.now().toString(),
+                        url: res.url,
+                        ...historyMeta,
+                        timestamp: new Date().toISOString(),
+                    });
+                    flashBanner('Image ready — open it from History on the right', false);
                 },
-                {
-                    onDone: (res) => {
-                        if (!res?.url) {
-                            console.error('[ImageStudio] No image URL in response:', res);
-                            flashBanner('Image failed: no image URL returned by API');
-                            return;
-                        }
-                        addToHistory({
-                            id: res.id || Date.now().toString(),
-                            url: res.url,
-                            prompt: historyMeta.prompt,
-                            model: historyMeta.model,
-                            aspect_ratio: historyMeta.aspect_ratio,
-                            timestamp: new Date().toISOString(),
-                        });
-                    },
-                    onFail: (e) => {
-                        console.error('[ImageStudio] Generation failed:', e);
-                        flashBanner(`Image failed: ${e.message.slice(0, 80)}`);
-                    },
-                }
-            );
-        } catch (e) {
-            failed = true;
+                onFail: (e) => {
+                    console.error('[ImageStudio] Generation failed:', e);
+                    queueHistory.fail(tempId);
+                    flashBanner(`Image failed: ${e.message.slice(0, 80)}`);
+                },
+            }
+        ).catch((e) => {
             console.error('[ImageStudio] Could not queue generation:', e);
-            generateBtn.innerHTML = `Error: ${e.message.slice(0, 60)}`;
-            setTimeout(() => {
-                generateBtn.innerHTML = `Generate ✨`;
-            }, 4000);
-        } finally {
-            submitting = false;
-            generateBtn.disabled = false;
-            if (!failed) generateBtn.innerHTML = `Generate ✨`;
-        }
+            queueHistory.fail(tempId);
+            flashBanner(`Could not start image: ${e.message.slice(0, 80)}`);
+        });
     };
 
     return container;

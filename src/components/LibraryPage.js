@@ -3,6 +3,35 @@
 // the newest first. Requires a backend session; prompts sign-in otherwise.
 import { cfBackendEnabled, listLibrary, deleteLibraryItem } from '../lib/api.js';
 import { BackendModal } from './BackendModal.js';
+import { getInFlightJobs } from '../lib/pendingJobs.js';
+
+// Escape text that is interpolated into innerHTML templates (prompts and model
+// names come from user input / the library backend).
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const safeUrl = (v) => (/^https?:\/\//i.test(String(v || '')) ? esc(v) : '');
+
+// Jobs submitted in this browser that the backend list may not contain yet
+// (still being submitted, or the library has not been refreshed).
+function localPlaceholders(items) {
+    const known = new Set(items.map(it => String(it.taskId || '')).filter(Boolean));
+    return getInFlightJobs()
+        .filter(j => !known.has(String(j.requestId).replace(/^cf:/, '')))
+        .map(j => ({
+            id: `local-${j.requestId}`,
+            local: true,
+            kind: j.studioType === 'video' || j.studioType === 'lipsync' ? 'videos' : 'images',
+            model: j.historyMeta?.model || '',
+            prompt: j.historyMeta?.prompt || '',
+            status: 'Queued',
+            state: 'draft',
+            credits: j.historyMeta?.credits ?? null,
+            creditStatus: 'estimated',
+            duration: j.historyMeta?.duration || null,
+            createdAt: new Date(j.submittedAt || Date.now()).toISOString(),
+        }));
+}
+
+const creditText = (item) => (item.credits ? `${item.creditStatus === 'estimated' ? '≈' : ''}${item.credits} cr` : '');
 
 const state = { items: [], filter: 'all', error: '' };
 
@@ -31,7 +60,7 @@ function groupOf(item) {
 }
 
 function filtered() {
-    return state.items
+    return [...state.items, ...localPlaceholders(state.items)]
         .slice()
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
         .filter(it => state.filter === 'all' ? true : groupOf(it) === state.filter);
@@ -39,9 +68,9 @@ function filtered() {
 
 function mediaBody(item) {
     if (item.url && item.thumb && groupOf(item) === 'videos') {
-        return `<video src="${item.url}" poster="${item.thumb}" muted playsinline preload="metadata" class="w-full h-full object-cover"></video>`;
+        return `<video src="${safeUrl(item.url)}" poster="${safeUrl(item.thumb)}" muted playsinline preload="metadata" class="w-full h-full object-cover"></video>`;
     }
-    if (item.thumb) return `<img src="${item.thumb}" alt="${item.model} result" loading="lazy" class="w-full h-full object-cover">`;
+    if (item.thumb) return `<img src="${safeUrl(item.thumb)}" alt="${esc(item.model)} result" loading="lazy" class="w-full h-full object-cover">`;
     if (item.state === 'waiting' || item.state === 'draft') {
         return `<div class="w-full h-full flex flex-col items-center justify-center gap-2 bg-white/5">
             <div class="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
@@ -115,8 +144,8 @@ function openPreview(item) {
     overlay.innerHTML = `
         <div class="flex items-center justify-between gap-4 px-4 md:px-8 py-4">
             <div class="min-w-0">
-                <p class="text-sm font-bold text-white truncate">${item.model || 'unknown model'}</p>
-                <p class="text-[11px] text-secondary truncate">${kindLabel(item)} · ${timeAgo(item.createdAt)}${item.credits ? ` · ${item.credits} cr` : ''}${item.resolution ? ` · ${item.resolution}` : ''}</p>
+                <p class="text-sm font-bold text-white truncate">${esc(item.model) || 'unknown model'}</p>
+                <p class="text-[11px] text-secondary truncate">${kindLabel(item)} · ${timeAgo(item.createdAt)}${item.credits ? ` · ${creditText(item)}` : ''}${item.duration ? ` · ${esc(item.duration)}s` : ''}${item.resolution ? ` · ${esc(item.resolution)}` : ''}</p>
             </div>
             <button data-close class="shrink-0 w-10 h-10 rounded-full bg-white/10 hover:bg-[#ff2d2d] text-white flex items-center justify-center transition-colors" title="Close">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
@@ -124,14 +153,14 @@ function openPreview(item) {
         </div>
         <div class="flex-1 min-h-0 flex items-center justify-center px-4 pb-4">
             ${isVideo
-                ? `<video src="${fullUrl}" poster="${item.thumb || ''}" controls autoplay playsinline class="max-w-full max-h-full rounded-xl shadow-3xl"></video>`
-                : `<img src="${fullUrl}" alt="${item.model} result" class="max-w-full max-h-full object-contain rounded-xl shadow-3xl">`}
+                ? `<video src="${safeUrl(fullUrl)}" poster="${safeUrl(item.thumb)}" controls autoplay playsinline class="max-w-full max-h-full rounded-xl shadow-3xl"></video>`
+                : `<img src="${safeUrl(fullUrl)}" alt="${esc(item.model)} result" class="max-w-full max-h-full object-contain rounded-xl shadow-3xl">`}
         </div>
         <div class="px-4 md:px-8 pb-6 flex flex-col items-center gap-4">
-            ${item.prompt ? `<p class="max-w-3xl text-center text-xs text-secondary leading-relaxed line-clamp-3">${item.prompt}</p>` : ''}
+            ${item.prompt ? `<p class="max-w-3xl text-center text-xs text-secondary leading-relaxed line-clamp-3">${esc(item.prompt)}</p>` : ''}
             <div class="flex items-center gap-3 flex-wrap justify-center">
                 <button data-save class="px-6 py-3 rounded-xl bg-primary text-black text-[11px] font-black uppercase tracking-widest shadow-glow hover:scale-105 active:scale-95 transition-all">Save to device</button>
-                <a href="${item.sourceUrl || fullUrl}" target="_blank" rel="noopener" class="px-6 py-3 rounded-xl bg-white/10 text-white text-[11px] font-black uppercase tracking-widest hover:bg-white/20 transition-all">Open original</a>
+                <a href="${safeUrl(item.sourceUrl || fullUrl)}" target="_blank" rel="noopener" class="px-6 py-3 rounded-xl bg-white/10 text-white text-[11px] font-black uppercase tracking-widest hover:bg-white/20 transition-all">Open original</a>
             </div>
         </div>
     `;
@@ -159,15 +188,16 @@ function card(item, onDelete) {
         </div>
         <div class="absolute top-3 left-3 flex gap-2 items-center">
             <span class="px-2 py-1 rounded-md bg-black/70 backdrop-blur text-[9px] font-black uppercase tracking-widest text-white border border-white/10">${kindLabel(item)}</span>
-            ${ready ? '' : `<span class="px-2 py-1 rounded-md bg-black/70 backdrop-blur text-[9px] font-black uppercase tracking-widest text-primary border border-primary/30">${(item.status || item.state || 'draft').toUpperCase()}</span>`}
+            ${ready ? '' : `<span class="px-2 py-1 rounded-md bg-black/70 backdrop-blur text-[9px] font-black uppercase tracking-widest text-primary border border-primary/30">${esc((item.status || item.state || 'draft').toUpperCase())}</span>`}
         </div>
+        ${item.credits ? `<span class="absolute bottom-3 right-3 px-2 py-1 rounded-md bg-black/75 text-[10px] font-black text-primary group-hover:opacity-0 transition-opacity">${creditText(item)}</span>` : ''}
         <div class="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/95 via-black/70 to-transparent translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
-            <p class="text-[11px] text-white/90 leading-snug line-clamp-2 mb-1">${item.model || 'unknown model'}</p>
-            <p class="text-[10px] text-secondary truncate">${item.prompt || ''}</p>
+            <p class="text-[11px] text-white/90 leading-snug line-clamp-2 mb-1">${esc(item.model) || 'unknown model'}</p>
+            <p class="text-[10px] text-secondary truncate">${esc(item.prompt)}</p>
             <div class="mt-2 flex items-center gap-2 text-[10px] text-muted">
                 <span>${timeAgo(item.createdAt)}</span>
-                ${item.credits ? `<span class="text-primary">${item.credits} cr</span>` : ''}
-                ${item.duration ? `<span>${item.duration}s</span>` : ''}
+                ${item.credits ? `<span class="text-primary">${creditText(item)}</span>` : ''}
+                ${item.duration ? `<span>${esc(item.duration)}s</span>` : ''}
             </div>
         </div>
     `;
@@ -190,7 +220,7 @@ function card(item, onDelete) {
             alert(err.message || 'Could not delete this item.');
         }
     };
-    card.appendChild(deleteBtn);
+    if (!item.local) card.appendChild(deleteBtn);
 
     if (ready) {
         card.onclick = () => openPreview(item);
@@ -299,7 +329,7 @@ export function LibraryPage() {
             state.items = items || [];
             renderGrid();
         } catch (err) {
-            grid.innerHTML = `<div class="col-span-full text-center py-16 text-sm text-secondary">${err.message || 'Failed to load the library.'}</div>`;
+            grid.innerHTML = `<div class="col-span-full text-center py-16 text-sm text-secondary">${esc(err.message || 'Failed to load the library.')}</div>`;
             countEl.textContent = '0 items';
         }
     };
@@ -307,5 +337,17 @@ export function LibraryPage() {
     page.$pageRefresh = load;
     select('all');
     load();
+
+    // Keep queued cards moving: refresh while anything is still generating.
+    const hasPending = () => getInFlightJobs().length > 0
+        || state.items.some(it => !it.url && !['failed'].includes(it.state) && it.status !== 'Failed');
+    let loading = false;
+    const timer = setInterval(async () => {
+        if (!page.isConnected) { clearInterval(timer); return; }
+        if (loading || !cfBackendEnabled()) return;
+        if (!hasPending()) return;
+        loading = true;
+        try { await load(); } finally { loading = false; }
+    }, 6000);
     return page;
 }

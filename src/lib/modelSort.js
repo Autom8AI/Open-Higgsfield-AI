@@ -12,6 +12,7 @@
 
 let priceMapPromise = null;
 const priceMap = new Map();
+const rawPricing = new Map();
 
 function priceOf(entry, model) {
     if (!entry) return null;
@@ -36,6 +37,7 @@ export function loadPricing() {
                 for (const model of list) {
                     const price = priceOf(model?.pricing, model);
                     if (price != null) priceMap.set(model.id, price);
+                    if (model?.pricing) rawPricing.set(model.id, model.pricing);
                 }
                 return priceMap;
             })
@@ -59,4 +61,61 @@ export function sortByPriceDesc(models) {
         if (pb == null) return -1;
         return pb - pa;
     });
+}
+
+
+// ── Cost helpers ────────────────────────────────────────────────────────────
+// Credits for one run of `model`. Per-second prices are multiplied by the
+// duration. Prefers a price measured for the chosen resolution, then the
+// published one, then the overall average. Returns null when nothing is known.
+export function priceInfo(model, resolution) {
+    const p = rawPricing.get(model?.id);
+    if (!p) return null;
+    const res = resolution ? String(resolution) : null;
+    const pick = (src, unit) => (src && src.credits != null && Number.isFinite(Number(src.credits))
+        ? { credits: Number(src.credits), unit: src.unit || unit || '' } : null);
+    const at = (table) => {
+        if (!res || !table) return null;
+        return table[res] || table[res.toLowerCase()] || table[res.toUpperCase()] || null;
+    };
+    return pick(at(p.measuredByResolution), p.measuredUnit)
+        || pick(at(p.byResolution), p.unit)
+        || pick({ credits: p.measuredCredits, unit: p.measuredUnit }, p.measuredUnit)
+        || pick(p, p.unit);
+}
+
+const round = (n) => Math.round(n * 10) / 10;
+
+// Estimated credits for a specific run, or null if the price is unknown.
+export function estimateCredits(model, { duration, resolution } = {}) {
+    const info = priceInfo(model, resolution);
+    if (!info) return null;
+    if (/sec/i.test(info.unit)) {
+        const d = Number(duration);
+        return Number.isFinite(d) && d > 0 ? round(info.credits * d) : null;
+    }
+    return round(info.credits);
+}
+
+// Short label for lists: "28 cr/s", "4 cr/image".
+export function priceLabel(model, resolution) {
+    const info = priceInfo(model, resolution);
+    if (!info) return '';
+    const unit = String(info.unit || '').replace(/^cr\//, '').replace('sec', 's');
+    return `${round(info.credits)} cr${unit ? '/' + unit : ''}`;
+}
+
+// Right-aligned price chip used in model dropdowns.
+export function priceChipHtml(model, resolution) {
+    const label = priceLabel(model, resolution);
+    return label ? `<span class="text-[10px] font-bold text-primary/90 whitespace-nowrap">${label}</span>` : '';
+}
+
+// Text for the cost label beside Generate: "≈ 70 cr" when the run can be
+// priced, "14 cr/s" when only a per-second rate is known (duration depends on
+// the input), or '' when nothing is known.
+export function costText(model, opts = {}) {
+    const credits = estimateCredits(model, opts);
+    if (credits != null) return `≈ ${credits} cr`;
+    return priceLabel(model, opts.resolution);
 }

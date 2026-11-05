@@ -149,6 +149,8 @@ exports.handler = guard('library', async function (event) {
     const provider = providerFor(params)
     const creditValue = Number(params._credits)
     const hasCredits = Number.isFinite(creditValue) && creditValue > 0
+    const estimateValue = Number(params._estimated)
+    const hasEstimate = !hasCredits && Number.isFinite(estimateValue) && estimateValue > 0
     const ready = Boolean(attachment?.url) || ['ready', 'success', 'completed'].includes(state)
     const duration = Number(params.duration || params._duration || 0) || null
 
@@ -166,8 +168,8 @@ exports.handler = guard('library', async function (event) {
       sourceUrl: /^https?:\/\//i.test(String(fields['Source URL'] || '')) ? fields['Source URL'] : '',
       mime: attachment?.type || '',
       provider,
-      credits: hasCredits ? creditValue : null,
-      creditStatus: hasCredits ? (ready ? 'actual' : 'estimated') : 'unknown',
+      credits: hasCredits ? creditValue : (hasEstimate ? estimateValue : null),
+      creditStatus: hasCredits ? (ready ? 'actual' : 'estimated') : (hasEstimate ? 'estimated' : 'unknown'),
       costUsd: provider === 'fal' && hasCredits ? Math.round((creditValue / 100) * 1000) / 1000 : null,
       duration,
       aspect: params.aspect_ratio || '',

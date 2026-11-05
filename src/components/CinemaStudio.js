@@ -3,6 +3,12 @@ import { kie } from '../lib/kie.js';
 import { CameraControls } from './CameraControls.js';
 import { buildNanoBananaPrompt, CAMERA_MAP, LENS_MAP, FOCAL_PERSPECTIVE, APERTURE_EFFECT } from '../lib/promptUtils.js';
 import { AuthModal } from './AuthModal.js';
+import { startGenerationJob } from '../lib/pendingJobs.js';
+import { loadPricing, costText } from '../lib/modelSort.js';
+import { createQueueHistory, pendingThumbHtml, creditBadgeHtml, costMeta } from '../lib/studioQueue.js';
+
+// Cinema Studio always shoots with this model; its price comes from the backend registry.
+const CINEMA_MODEL = { id: 'nano-banana-pro' };
 
 export function CinemaStudio() {
     const container = document.createElement('div');
@@ -180,7 +186,7 @@ export function CinemaStudio() {
     };
     updateResBtn('2K');
     resBtn.onclick = () => {
-        createDropdown(['1K', '2K', '4K'], resBtn.dataset.value, (val) => { updateResBtn(val); }, resBtn);
+        createDropdown(['1K', '2K', '4K'], resBtn.dataset.value, (val) => { updateResBtn(val); refreshCost(); }, resBtn);
     };
     settingsToolbar.appendChild(resBtn);
     
@@ -238,7 +244,16 @@ export function CinemaStudio() {
     generateBtn.setAttribute('data-tooltip', 'Generate cinema shot');
     generateBtn.innerHTML = `GENERATE ✨`;
 
+    // Estimated cost of the next shot, beside Generate.
+    const costEl = document.createElement('span');
+    costEl.className = 'hidden sm:inline text-[11px] font-bold text-white/50 whitespace-nowrap self-center';
+    const refreshCost = () => {
+        costEl.textContent = costText(CINEMA_MODEL, { resolution: resBtn.dataset.value });
+    };
+    loadPricing().then(refreshCost);
+
     rightGroup.appendChild(summaryCard);
+    rightGroup.appendChild(costEl);
     rightGroup.appendChild(generateBtn);
     promptBar.appendChild(rightGroup);
 
@@ -413,14 +428,27 @@ export function CinemaStudio() {
     container.appendChild(canvas);
 
     // --- History Logic ---
+    const queueHistory = createQueueHistory({
+        history: generationHistory, storageKey: 'cinema_history', limit: 50,
+        render: () => renderHistory(),
+    });
+
     const renderHistory = () => {
         historyList.innerHTML = '';
         generationHistory.forEach((entry, idx) => {
             const thumb = document.createElement('div');
-            thumb.className = `relative group/thumb cursor-pointer rounded-lg overflow-hidden border-2 transition-all duration-300 aspect-square ${idx === 0 ? 'border-[#ff2d2d] shadow-glow-sm' : 'border-white/10 hover:border-white/30'}`;
+            thumb.className = `relative group/thumb ${entry.pending ? '' : 'cursor-pointer'} rounded-lg overflow-hidden border-2 transition-all duration-300 aspect-square ${idx === 0 ? 'border-[#ff2d2d] shadow-glow-sm' : 'border-white/10 hover:border-white/30'}`;
+
+            if (entry.pending) {
+                thumb.title = entry.settings?.prompt ? `Shooting: ${entry.settings.prompt.slice(0, 80)}` : 'Shooting…';
+                thumb.innerHTML = pendingThumbHtml(entry);
+                historyList.appendChild(thumb);
+                return;
+            }
 
             thumb.innerHTML = `
                 <img src="${entry.url}" class="w-full h-full object-cover opacity-80 group-hover/thumb:opacity-100 transition-opacity">
+                ${creditBadgeHtml(entry)}
                 <div class="absolute inset-0 bg-black/50 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center">
                     <span class="text-[8px] font-bold text-white uppercase">Load</span>
                 </div>
@@ -431,11 +459,7 @@ export function CinemaStudio() {
         });
     };
 
-    const addToHistory = (entry) => {
-        generationHistory.unshift(entry);
-        localStorage.setItem('cinema_history', JSON.stringify(generationHistory.slice(0, 50)));
-        renderHistory();
-    };
+    const addToHistory = (entry) => queueHistory.resolve(null, entry);
 
     const loadHistoryItem = (entry, thumbElement) => {
         // Restore Settings
@@ -507,7 +531,20 @@ export function CinemaStudio() {
     newPromptBtn.onclick = resetToPrompt;
 
     regenerateBtn.onclick = () => {
+        // The prompt is cleared after every shot, so restore the viewed shot's settings first.
+        const entry = generationHistory.find(e => e.url === resultImg.src);
         resetToPrompt();
+        if (entry?.settings) {
+            Object.assign(currentSettings, {
+                camera: entry.settings.camera, lens: entry.settings.lens, focal: entry.settings.focal,
+                aperture: entry.settings.aperture, aspect_ratio: entry.settings.aspect_ratio,
+            });
+            textarea.value = entry.settings.prompt || '';
+            updateSummaryCard();
+            updateArBtn();
+            updateResBtn(entry.settings.resolution || '2K');
+            refreshCost();
+        }
         setTimeout(() => {
             generateBtn.click();
         }, 300);
@@ -533,7 +570,7 @@ export function CinemaStudio() {
     // ==========================================
     // 5. GENERATION LOGIC UPDATE
     // ==========================================
-    generateBtn.onclick = async () => {
+    generateBtn.onclick = () => {
         const basePrompt = textarea.value.trim();
         if (!basePrompt) return;
 
@@ -544,10 +581,11 @@ export function CinemaStudio() {
             return;
         }
 
-        generateBtn.disabled = true;
-        generateBtn.innerHTML = "SHOOTING...";
-
-        // Compile Prompt
+        // Snapshot this shot, then clear the prompt so the next one can start immediately.
+        const resolution = resBtn.dataset.value;
+        const settings = { prompt: basePrompt, ...currentSettings, resolution };
+        const cost = costMeta(CINEMA_MODEL, { resolution });
+        const historyMeta = { settings, model: CINEMA_MODEL.id, ...cost };
         const finalPrompt = buildNanoBananaPrompt(
             basePrompt,
             currentSettings.camera,
@@ -556,39 +594,50 @@ export function CinemaStudio() {
             currentSettings.aperture
         );
 
-        try {
-            const res = await kie.generateImage({
-                model: 'nano-banana-pro',
+        const tempId = queueHistory.addPending(historyMeta);
+        textarea.value = '';
+
+        const flash = (text, isError = true) => {
+            const el = document.createElement('div');
+            el.className = `fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-[#111] border ${isError ? 'border-red-500/40' : 'border-[#ff2d2d]/40'} text-white text-sm px-5 py-3 rounded-2xl shadow-xl`;
+            el.textContent = text;
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 5000);
+        };
+
+        // Not awaited: the studio stays usable while the shot is queued and polled.
+        startGenerationJob(
+            { studioType: 'cinema', historyMeta, maxAttempts: 150, interval: 2000 },
+            (queueRequest) => kie.generateImage({
+                model: CINEMA_MODEL.id,
                 prompt: finalPrompt,
-                aspect_ratio: currentSettings.aspect_ratio,
-                resolution: (resBtn.dataset.value || '1k').toLowerCase(),
-                negative_prompt: "blurry, low quality, distortion, bad composition"
-            });
-
-            if (res && res.url) {
-                // Save to history
-                addToHistory({
-                    url: res.url,
-                    timestamp: Date.now(),
-                    settings: {
-                        prompt: basePrompt,
-                        ...currentSettings,
-                        resolution: resBtn.dataset.value
+                aspect_ratio: settings.aspect_ratio,
+                resolution: (resolution || '1k').toLowerCase(),
+                negative_prompt: "blurry, low quality, distortion, bad composition",
+                ...(cost.credits ? { estimatedCredits: cost.credits } : {}),
+                onRequestId: queueRequest,
+            }),
+            {
+                onDone: (res) => {
+                    if (!res?.url) {
+                        queueHistory.fail(tempId);
+                        flash('Shot failed: no image URL returned by API');
+                        return;
                     }
-                });
-
-                showCanvas(res.url);
-            } else {
-                throw new Error('No Data');
+                    queueHistory.resolve(tempId, { url: res.url, timestamp: Date.now(), ...historyMeta });
+                    flash('Shot ready — open it from History on the right', false);
+                },
+                onFail: (e) => {
+                    console.error(e);
+                    queueHistory.fail(tempId);
+                    flash(`Shot failed: ${e.message.slice(0, 80)}`);
+                },
             }
-
-        } catch (e) {
+        ).catch((e) => {
             console.error(e);
-            alert('Generation Failed: ' + e.message);
-        } finally {
-            generateBtn.disabled = false;
-            generateBtn.innerHTML = `GENERATE ✨`;
-        }
+            queueHistory.fail(tempId);
+            flash(`Could not start shot: ${e.message.slice(0, 80)}`);
+        });
     };
 
     return container;

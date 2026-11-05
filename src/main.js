@@ -22,6 +22,10 @@ function navigate(page) {
     import('./components/FactoryStudio.js').then(({ FactoryStudio }) => {
       contentArea.appendChild(FactoryStudio());
     });
+  } else if (page === 'remix') {
+    import('./components/RemixStudio.js').then(({ RemixStudio }) => {
+      contentArea.appendChild(RemixStudio());
+    });
   } else if (page === 'library') {
     import('./components/LibraryPage.js').then(({ LibraryPage }) => {
       contentArea.appendChild(LibraryPage());

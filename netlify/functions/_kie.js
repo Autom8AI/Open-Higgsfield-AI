@@ -16,7 +16,51 @@ const hasAirtableCredential = () => Boolean(
   || process.env.AIRTABLE_PAT
 )
 
-const models = () => REGISTRY.models
+// Video-to-video models used by the Remix tab. They take a source video (and
+// reference images) instead of a text-only prompt, so they live beside the
+// generated registry rather than in it. `single: true` means kie wants a plain
+// string instead of an array for that field.
+const REMIX_MODELS = [
+  {
+    id: 'kling-3.0/motion-control',
+    label: 'Kling 3.0 Motion Control',
+    kind: 'video',
+    api: 'jobs',
+    remix: 'motion',
+    blurb: 'Moves your character with the motion of a source video.',
+    images: { param: 'input_urls', max: 1, required: true },
+    videos: { param: 'video_urls', max: 1, required: true },
+    resolutions: ['720p', '1080p'],
+    resolutionDefault: '720p',
+    resolutionParam: 'mode',
+  },
+  {
+    id: 'happyhorse/video-edit',
+    label: 'HappyHorse Video Edit',
+    kind: 'video',
+    api: 'jobs',
+    remix: 'edit',
+    blurb: 'Edit a video from a prompt, with up to 5 reference images.',
+    images: { param: 'reference_image', max: 5, required: false },
+    videos: { param: 'video_url', max: 1, required: true, single: true },
+    resolutions: ['720p', '1080p'],
+    resolutionDefault: '1080p',
+  },
+  {
+    id: 'wan/2-7-videoedit',
+    label: 'Wan 2.7 Video Edit',
+    kind: 'video',
+    api: 'jobs',
+    remix: 'edit',
+    blurb: 'Edit a 2-10 second video with one reference image.',
+    images: { param: 'reference_image', max: 1, required: false, single: true },
+    videos: { param: 'video_url', max: 1, required: true, single: true },
+    resolutions: ['720p', '1080p'],
+    resolutionDefault: '1080p',
+  },
+]
+
+const models = () => [...REGISTRY.models, ...REMIX_MODELS]
 const byId = (id) => models().find((m) => m.id === id)
 
 function json(statusCode, body) {

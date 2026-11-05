@@ -1,4 +1,5 @@
 import { buildVideoParams } from './videoSpecs.js';
+import { REMIX_SPECS } from './remixSpecs.js';
 // Bridge to the content-factory Netlify function backend (same account,
 // credits and Airtable library). Activated by logging in; falls back to the
 // direct kie.ai client when no session is active.
@@ -189,6 +190,50 @@ export async function uploadFile(file) {
     });
     const json = await request('/upload', { method: 'POST', body: JSON.stringify({ image: dataUrl, index: 0 }) });
     return json.url;
+}
+
+// Large files (source videos) cannot go through a function body, so the backend
+// hands out a one-off upload URL and the browser sends the file straight to it.
+export async function uploadLargeFile(file, onProgress) {
+    let ticket;
+    try {
+        ticket = await request('/upload-ticket', {
+            method: 'POST',
+            body: JSON.stringify({ fileName: file.name, contentType: file.type || 'application/octet-stream' })
+        });
+    } catch (error) {
+        if (/FAL_KEY_REQUIRED/.test(error.message)) {
+            throw new Error('Uploading videos needs a fal.ai key on your account. Add one in your account settings.');
+        }
+        throw error;
+    }
+    await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open(ticket.method || 'PUT', ticket.uploadUrl);
+        xhr.setRequestHeader('Content-Type', ticket.contentType || file.type || 'application/octet-stream');
+        xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress?.(e.loaded / e.total); };
+        xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Video upload failed (${xhr.status})`)));
+        xhr.onerror = () => reject(new Error('Video upload failed (network error)'));
+        xhr.send(file);
+    });
+    return ticket.fileUrl;
+}
+
+// Video-to-video: source video + optional reference images (+ prompt).
+export async function generateRemix(params) {
+    const spec = REMIX_SPECS[params.model];
+    if (!spec) throw new Error(`Unknown remix model: ${params.model}`);
+    const prompt = (params.prompt || '').trim() || spec.defaultPrompt || 'Apply the reference to the video.';
+    return create({
+        modelId: params.model,
+        prompt,
+        images: params.images || [],
+        videos: [params.video_url],
+        params: {
+            ...(params.resolution ? { resolution: params.resolution } : {}),
+            ...Object.fromEntries((spec.extras || []).map(f => [f.key, params.extra?.[f.key] ?? f.default]))
+        }
+    }, { maxAttempts: 900, ...params });
 }
 
 export async function buildPrompt(brief, kind = 'image') {

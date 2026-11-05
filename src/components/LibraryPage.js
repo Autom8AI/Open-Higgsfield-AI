@@ -19,7 +19,7 @@ function localPlaceholders(items) {
         .map(j => ({
             id: `local-${j.requestId}`,
             local: true,
-            kind: ['video', 'lipsync', 'factory'].includes(j.studioType) ? 'videos' : 'images',
+            kind: ['video', 'lipsync', 'factory', 'remix'].includes(j.studioType) ? 'videos' : 'images',
             model: j.historyMeta?.model || '',
             prompt: j.historyMeta?.prompt || '',
             status: 'Queued',

@@ -235,7 +235,6 @@ exports.handler = guard('create', async function (event) {
   }
 
   if (!keys.kie) return json(403, { error: 'KIE_KEY_REQUIRED' })
-  if (videos.length) return json(400, { error: `${modelId} does not accept a source video. Select Video Edit.` })
 
   const isCarInteriorPreset = typeof prompt === 'string' && prompt.startsWith(CAR_INTERIOR_PREFIX)
   if (isCarInteriorPreset) {
@@ -262,6 +261,11 @@ exports.handler = guard('create', async function (event) {
     : registeredModel
   if (!model) return json(400, { error: `Unknown model: ${modelId}` })
   if (model.supported === false) return json(400, { error: `${model.label} needs the ${model.api} transport, not implemented.` })
+  if (videos.length && !model.videos) return json(400, { error: `${model.label} does not accept a source video. Select Video Edit.` })
+  if (model.videos) {
+    if (model.videos.required && videos.length !== 1) return json(400, { error: `${model.label} requires exactly one source video.` })
+    if (videos.length > model.videos.max || videos.some(v => !isPublicUrl(v))) return json(400, { error: `${model.label} needs a public source-video URL.` })
+  }
   if (images.length && !model.images) return json(400, { error: `${model.label} accepts no reference images.` })
   if (model.images?.required && !images.length && !brand) return json(400, { error: `${model.label} requires at least one image.` })
   if (model.images && images.length > model.images.max) return json(400, { error: `${model.label} accepts at most ${model.images.max} images.` })
@@ -284,7 +288,9 @@ exports.handler = guard('create', async function (event) {
   } else if (brand && !model.images) return json(400, { error: `${model.label} cannot use the logo because it accepts no reference images.` })
 
   const input = { prompt, ...params }
-  if (hosted.length && model.images) input[model.images.param] = hosted
+  if (hosted.length && model.images) input[model.images.param] = model.images.single ? hosted[0] : hosted
+  if (videos.length && model.videos) input[model.videos.param] = model.videos.single ? videos[0] : videos
+  if (model.resolutionParam && input.resolution) { input[model.resolutionParam] = input.resolution; delete input.resolution }
   const base = process.env.URL || process.env.DEPLOY_PRIME_URL
   const cb = base ? `${base}/.netlify/functions/callback` : undefined
   const taskId = await createTask(modelId, input, cb, keys.kie)

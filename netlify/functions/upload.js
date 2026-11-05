@@ -17,8 +17,9 @@ exports.handler = guard('upload', async function (event) {
   if (typeof image !== 'string' || !image) {
     return json(400, { error: 'Image data is required.' })
   }
-  if (!image.startsWith('data:image/') && !/^https?:\/\//i.test(image)) {
-    return json(400, { error: 'A valid image upload or public image URL is required.' })
+  // Reference images and short audio clips (lip sync); large videos use /upload-ticket.
+  if (!image.startsWith('data:image/') && !image.startsWith('data:audio/') && !/^https?:\/\//i.test(image)) {
+    return json(400, { error: 'A valid image or audio upload, or a public URL, is required.' })
   }
 
   const index = Number.isFinite(Number(body.index)) ? Number(body.index) : 0

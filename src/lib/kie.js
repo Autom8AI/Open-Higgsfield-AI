@@ -1,6 +1,7 @@
 import { getModelById, getVideoModelById, getI2IModelById, getI2VModelById } from './models.js';
 import * as cf from './api.js';
 import { buildVideoParams } from './videoSpecs.js';
+import { buildRemixInput } from './remixSpecs.js';
 
 const KIE_BASE = 'https://api.kie.ai';
 
@@ -345,6 +346,27 @@ export class KieClient {
         const result = await this._submitTask(settings.model, input, { onRequestId: params.onRequestId, maxAttempts: 900 });
         const videoUrl = this._extractUrl(result) || result.url || result.output?.url;
         console.log('[Kie] Video URL:', videoUrl);
+        return { ...result, url: videoUrl };
+    }
+
+    /**
+     * Uploads a (possibly large) source video and returns a public URL.
+     */
+    async uploadVideo(file, onProgress) {
+        const bridge = cfPath();
+        if (bridge) return bridge.uploadLargeFile(file, onProgress);
+        return this.uploadFile(file);
+    }
+
+    /**
+     * Video-to-video generation (Remix): motion transfer and object swap / edit.
+     */
+    async generateRemix(params) {
+        const bridge = cfPath();
+        if (bridge) return bridge.generateRemix(params);
+        const input = buildRemixInput(params.model, params);
+        const result = await this._submitTask(params.model, input, { onRequestId: params.onRequestId, maxAttempts: 900 });
+        const videoUrl = this._extractUrl(result) || result.url || result.output?.url;
         return { ...result, url: videoUrl };
     }
 

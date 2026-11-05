@@ -13,6 +13,7 @@ import { getVideoSpec } from '../lib/videoSpecs.js';
 import { startGenerationJob, getPendingJobs, removePendingJob } from '../lib/pendingJobs.js';
 import { loadPricing, estimateCredits, priceLabel, sortByPriceDesc } from '../lib/modelSort.js';
 import { createQueueHistory, costMeta } from '../lib/studioQueue.js';
+import { renderResultGrid } from '../lib/resultCards.js';
 
 const PLATFORMS = [
     { id: 'reels', label: 'Reels / TikTok / Shorts', hint: 'Vertical 9:16', prefer: ['9:16'] },
@@ -40,8 +41,6 @@ const ANGLES = [
 ];
 
 const MAX_VARIATIONS = 6;
-
-const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 export function FactoryStudio() {
     const container = document.createElement('div');
@@ -272,47 +271,10 @@ export function FactoryStudio() {
         setTimeout(() => el.remove(), 5000);
     };
 
-    const downloadFile = async (url, filename) => {
-        try {
-            const blob = await (await fetch(url)).blob();
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob); a.download = filename;
-            document.body.appendChild(a); a.click(); a.remove();
-            setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-        } catch { window.open(url, '_blank'); }
-    };
-
     function renderResults() {
         resultsSection.classList.toggle('hidden', batchHistory.length === 0);
         resultsSection.classList.toggle('flex', batchHistory.length > 0);
-        resultsGrid.innerHTML = '';
-        batchHistory.forEach((entry, idx) => {
-            const card = document.createElement('div');
-            card.className = 'rounded-2xl overflow-hidden bg-card-bg border border-white/10 flex flex-col';
-            const creditText = entry.credits != null ? `${entry.pending ? '≈' : (entry.creditsEstimated === false ? '' : '≈')}${entry.credits} cr` : '';
-            const meta = `<div class="px-3 py-2.5 flex flex-col gap-1">
-                <p class="text-[11px] text-white/90 leading-snug line-clamp-2">${esc(entry.prompt)}</p>
-                <div class="flex items-center gap-2 text-[10px] text-muted">
-                    <span>${esc(entry.modelName || entry.model)}</span>
-                    ${entry.duration ? `<span>${esc(entry.duration)}s</span>` : ''}
-                    ${entry.aspect_ratio ? `<span>${esc(entry.aspect_ratio)}</span>` : ''}
-                    ${creditText ? `<span class="text-primary font-bold">${creditText}</span>` : ''}
-                </div>
-            </div>`;
-            if (entry.pending) {
-                card.innerHTML = `<div class="aspect-[9/16] max-h-80 w-full flex flex-col items-center justify-center gap-2 bg-white/5">
-                    <div class="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-                    <span class="text-[9px] font-bold uppercase tracking-widest text-secondary">Generating</span></div>${meta}`;
-            } else {
-                card.innerHTML = `<video src="${esc(entry.url)}" muted loop playsinline controls preload="metadata" class="w-full max-h-80 object-cover bg-black"></video>${meta}`;
-                const dl = document.createElement('button');
-                dl.className = 'mx-3 mb-3 px-3 py-2 rounded-xl bg-primary text-black text-[11px] font-black uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all';
-                dl.textContent = 'Download';
-                dl.onclick = () => downloadFile(entry.url, `factory-${entry.id || idx}.mp4`);
-                card.appendChild(dl);
-            }
-            resultsGrid.appendChild(card);
-        });
+        renderResultGrid(resultsGrid, batchHistory, { prefix: 'factory' });
     }
 
     // ==========================================

@@ -318,8 +318,9 @@ export function createUploadPicker({ anchorContainer, onSelect, onClear, maxImag
         const files = Array.from(e.target.files);
         if (!files.length) return;
 
+        // Either a direct kie.ai key or a signed-in backend session can upload.
         const apiKey = localStorage.getItem('kie_key');
-        if (!apiKey) {
+        if (!apiKey && !localStorage.getItem('cf_backend')) {
             AuthModal(() => fileInput.click());
             return;
         }

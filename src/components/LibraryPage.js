@@ -68,7 +68,9 @@ function filtered() {
 
 function mediaBody(item) {
     if (item.url && item.thumb && groupOf(item) === 'videos') {
-        return `<video src="${safeUrl(item.url)}" poster="${safeUrl(item.thumb)}" muted playsinline preload="metadata" class="w-full h-full object-cover"></video>`;
+        // Video attachments have no image thumbnail; show the frame at 0.5s instead.
+        const src = safeUrl(item.url);
+        return src ? `<video src="${src}#t=0.5" muted playsinline preload="metadata" class="w-full h-full object-cover"></video>` : '';
     }
     if (item.thumb) return `<img src="${safeUrl(item.thumb)}" alt="${esc(item.model)} result" loading="lazy" class="w-full h-full object-cover">`;
     if (item.state === 'waiting' || item.state === 'draft') {
@@ -153,7 +155,7 @@ function openPreview(item) {
         </div>
         <div class="flex-1 min-h-0 flex items-center justify-center px-4 pb-4">
             ${isVideo
-                ? `<video src="${safeUrl(fullUrl)}" poster="${safeUrl(item.thumb)}" controls autoplay playsinline class="max-w-full max-h-full rounded-xl shadow-3xl"></video>`
+                ? `<video src="${safeUrl(fullUrl)}" controls autoplay playsinline class="max-w-full max-h-full rounded-xl shadow-3xl"></video>`
                 : `<img src="${safeUrl(fullUrl)}" alt="${esc(item.model)} result" class="max-w-full max-h-full object-contain rounded-xl shadow-3xl">`}
         </div>
         <div class="px-4 md:px-8 pb-6 flex flex-col items-center gap-4">

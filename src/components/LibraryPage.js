@@ -324,11 +324,19 @@ export function LibraryPage() {
         filters.appendChild(b);
     });
 
+    // Show the last list straight away; the fresh one replaces it when it arrives.
+    const CACHE_KEY = 'library_cache';
+    try {
+        const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+        if (Array.isArray(cached) && cached.length && cfBackendEnabled()) state.items = cached;
+    } catch { /* ignore */ }
+
     const load = async () => {
         if (!cfBackendEnabled()) { showAuthNeeded(); return; }
         try {
             const items = await listLibrary();
             state.items = items || [];
+            try { localStorage.setItem(CACHE_KEY, JSON.stringify(state.items.slice(0, 100))); } catch { /* storage full */ }
             renderGrid();
         } catch (err) {
             grid.innerHTML = `<div class="col-span-full text-center py-16 text-sm text-secondary">${esc(err.message || 'Failed to load the library.')}</div>`;

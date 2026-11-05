@@ -104,10 +104,25 @@ function bootApp() {
   navigate('library');
 }
 
-// Boot sequence: check the session first, render the app only when
-// signed in, otherwise show nothing but the sign-in screen.
-showCheckingScreen();
-hasValidSession().then((ok) => {
-  if (ok) bootApp();
-  else showSignInGate();
-});
+// Boot sequence. Returning users (signed in on this browser before) get the
+// app immediately and the session is confirmed in the background; every data
+// call is still checked by the backend. If the session turns out to be gone,
+// the sign-in screen replaces the app. First-time visitors wait for the check.
+if (localStorage.getItem('cf_backend')) {
+  bootApp();
+  hasValidSession().then((ok) => {
+    if (ok) return;
+    localStorage.removeItem('cf_backend');
+    localStorage.removeItem('library_cache');
+    booted = false;
+    showSignInGate();
+  });
+} else {
+  showCheckingScreen();
+  hasValidSession().then((ok) => {
+    if (ok) {
+      localStorage.setItem('cf_backend', '1');
+      bootApp();
+    } else showSignInGate();
+  });
+}

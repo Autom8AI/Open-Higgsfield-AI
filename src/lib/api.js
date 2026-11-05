@@ -48,6 +48,7 @@ export async function login(name, pin) {
 export async function logoutBackend() {
     const json = await request('/logout', { method: 'POST' });
     localStorage.removeItem(SESSION_FLAG);
+    localStorage.removeItem('library_cache');
     sessionActive = false;
     return json;
 }

@@ -33,7 +33,7 @@ function localPlaceholders(items) {
 
 const creditText = (item) => (item.credits ? `${item.creditStatus === 'estimated' ? '≈' : ''}${item.credits} cr` : '');
 
-const state = { items: [], filter: 'all', error: '' };
+const state = { items: [], filter: 'all', error: '', loaded: false };
 
 function timeAgo(iso) {
     const then = new Date(iso).getTime();
@@ -265,7 +265,7 @@ export function LibraryPage() {
         if (!items.length) {
             grid.innerHTML = `<div class="col-span-full flex flex-col items-center justify-center py-24 gap-3 text-center">
                 <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-muted)" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-                <p class="text-sm text-secondary">${state.filter === 'all' ? 'Nothing generated yet - your creations land here.' : `No ${state.filter} yet.`}</p>
+                <p class="text-sm text-secondary">${!state.loaded ? 'Loading your library…' : state.filter === 'all' ? 'Nothing generated yet - your creations land here.' : `No ${state.filter} yet.`}</p>
             </div>`;
         } else {
             items.forEach(item => grid.appendChild(card(item, (deleted) => {
@@ -336,6 +336,7 @@ export function LibraryPage() {
         try {
             const items = await listLibrary();
             state.items = items || [];
+            state.loaded = true;
             try { localStorage.setItem(CACHE_KEY, JSON.stringify(state.items.slice(0, 100))); } catch { /* storage full */ }
             renderGrid();
         } catch (err) {

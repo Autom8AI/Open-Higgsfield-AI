@@ -566,6 +566,19 @@ export function VideoStudio() {
         }
     };
 
+    // One-line capability summary shown under each model name: durations, resolutions, aspect ratios.
+    const modelSummary = (m) => {
+        const bits = [];
+        const d = m.durations || [];
+        if (d.length) {
+            const consecutive = d.every((v, i) => i === 0 || v === d[i - 1] + 1);
+            bits.push(consecutive && d.length > 2 ? `${d[0]}–${d[d.length - 1]}s` : d.map(v => `${v}s`).join('/'));
+        }
+        if (m.resolutions?.length) bits.push(m.resolutions.join('/'));
+        if (m.aspects?.length) bits.push(`${m.aspects.length} ratios`);
+        return bits.join(' · ');
+    };
+
     const showDropdown = (type, anchorBtn) => {
         dropdown.innerHTML = '';
         dropdown.classList.remove('opacity-0', 'pointer-events-none');
@@ -597,7 +610,7 @@ export function VideoStudio() {
                          <div class="w-10 h-10 ${iconColor} border border-white/5 rounded-xl flex items-center justify-center font-black text-sm shadow-inner uppercase">${m.name.charAt(0)}</div>
                          <div class="flex flex-col gap-0.5">
                             <span class="text-xs font-bold text-white tracking-tight">${m.name}</span>
-                            ${isV2V ? '<span class="text-[9px] text-orange-400/70">Upload a video to use</span>' : ''}
+                            ${isV2V ? '<span class="text-[9px] text-orange-400/70">Upload a video to use</span>' : `<span class="text-[10px] text-muted">${modelSummary(m)}</span>`}
                          </div>
                     </div>
                     <div class="flex items-center gap-2">

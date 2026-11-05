@@ -18,6 +18,10 @@ function navigate(page) {
     import('./components/VideoStudio.js').then(({ VideoStudio }) => {
       contentArea.appendChild(VideoStudio());
     });
+  } else if (page === 'factory') {
+    import('./components/FactoryStudio.js').then(({ FactoryStudio }) => {
+      contentArea.appendChild(FactoryStudio());
+    });
   } else if (page === 'library') {
     import('./components/LibraryPage.js').then(({ LibraryPage }) => {
       contentArea.appendChild(LibraryPage());

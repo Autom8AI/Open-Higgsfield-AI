@@ -340,6 +340,7 @@ export function LibraryPage() {
             try { localStorage.setItem(CACHE_KEY, JSON.stringify(state.items.slice(0, 100))); } catch { /* storage full */ }
             renderGrid();
         } catch (err) {
+            if (err.status === 401 || err.status === 403) localStorage.removeItem(CACHE_KEY);
             grid.innerHTML = `<div class="col-span-full text-center py-16 text-sm text-secondary">${esc(err.message || 'Failed to load the library.')}</div>`;
             countEl.textContent = '0 items';
         }

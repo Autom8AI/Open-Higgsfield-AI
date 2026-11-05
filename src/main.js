@@ -56,7 +56,7 @@ async function hasValidSession() {
     const res = await fetch('/.netlify/functions/session', { credentials: 'include' });
     if (!res.ok) return false;
     const data = await res.json().catch(() => null);
-    return Boolean(data && data.ok);
+    return data && data.ok ? String(data.sub || 'account') : false;
   } catch {
     return false;
   }
@@ -104,25 +104,19 @@ function bootApp() {
   navigate('library');
 }
 
-// Boot sequence. Returning users (signed in on this browser before) get the
-// app immediately and the session is confirmed in the background; every data
-// call is still checked by the backend. If the session turns out to be gone,
-// the sign-in screen replaces the app. First-time visitors wait for the check.
-if (localStorage.getItem('cf_backend')) {
-  bootApp();
-  hasValidSession().then((ok) => {
-    if (ok) return;
+// Boot sequence: confirm the session before rendering anything (the check is
+// a signature check on the backend, so it is quick), otherwise show only the
+// sign-in screen. The Library cache is tied to the signed-in account.
+showCheckingScreen();
+hasValidSession().then((sub) => {
+  if (sub) {
+    if (localStorage.getItem('library_cache_owner') !== sub) localStorage.removeItem('library_cache');
+    localStorage.setItem('library_cache_owner', sub);
+    localStorage.setItem('cf_backend', '1');
+    bootApp();
+  } else {
     localStorage.removeItem('cf_backend');
     localStorage.removeItem('library_cache');
-    booted = false;
     showSignInGate();
-  });
-} else {
-  showCheckingScreen();
-  hasValidSession().then((ok) => {
-    if (ok) {
-      localStorage.setItem('cf_backend', '1');
-      bootApp();
-    } else showSignInGate();
-  });
-}
+  }
+});

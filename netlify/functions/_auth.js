@@ -399,6 +399,7 @@ module.exports = {
   recordSuccess,
   issueSession,
   parseCookies,
+  verifySessionToken,
   sessionCookie,
   clearSessionCookie,
   requireAccount,

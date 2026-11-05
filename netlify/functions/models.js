@@ -85,7 +85,8 @@ function normalizeModel(model) {
 // flagged `from: true`; measured averages from real runs replace them.
 const KIE_FROM_PRICES = {
   'bytedance/seedance-2': [11.5, 'cr/sec'],
-  'bytedance/seedance-2-fast': [6.8, 'cr/sec'],
+  // Text/image-to-video rates; the lower 6.8 cr/s on kie.ai/pricing is for video input.
+  'bytedance/seedance-2-fast': [11.7, 'cr/sec', { '480p': 11.7, '720p': 24.8 }],
   'kling-3.0/video': [15.1, 'cr/sec'],
   'kling/v3-turbo-text-to-video': [20.2, 'cr/sec'],
   'wan/2-5-text-to-video': [60, 'cr/video'],
@@ -113,7 +114,10 @@ function withPublishedPrice(model) {
   if (model.pricing) return model
   const p = KIE_FROM_PRICES[model.id]
   if (!p) return model
-  return { ...model, pricing: { credits: p[0], unit: p[1], usd: Math.round(p[0] * 0.005 * 1000) / 1000, runs: 0, source: 'published', from: true } }
+  const byResolution = p[2]
+    ? Object.fromEntries(Object.entries(p[2]).map(([res, credits]) => [res, { credits, unit: p[1] }]))
+    : undefined
+  return { ...model, pricing: { credits: p[0], unit: p[1], byResolution, usd: Math.round(p[0] * 0.005 * 1000) / 1000, runs: 0, source: 'published', from: !p[2] } }
 }
 
 const allModels = () => [...models().map(normalizeModel), ...KIE_EXTRA_MODELS, ...FAL_MODELS].map(withPublishedPrice)

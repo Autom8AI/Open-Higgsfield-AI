@@ -8,6 +8,7 @@ import { ENHANCE_TAGS, QUICK_PROMPTS } from '../lib/promptUtils.js';
 import { sortByPriceDesc, loadPricing, priceChipHtml, costText } from '../lib/modelSort.js';
 import { createQueueHistory, pendingThumbHtml, creditBadgeHtml, costMeta } from '../lib/studioQueue.js';
 import { createCharacterButton } from '../lib/characters.js';
+import { IMAGE_STYLES, fitsStyle, filterByStyle, pickForStyle, joinPrompt } from '../lib/modelStyles.js';
 import { AuthModal } from './AuthModal.js';
 import { createUploadPicker } from './UploadPicker.js';
 import { savePendingJob, removePendingJob, getPendingJobs, startGenerationJob } from '../lib/pendingJobs.js';
@@ -36,6 +37,7 @@ export function ImageStudio() {
     let dropdownOpen = null;
     let uploadedImageUrls = []; // array of uploaded image URLs (multi-image support)
     let imageMode = false; // false = t2i models, true = i2i models
+    let selectedStyle = 'all'; // filters the model list and adds a style hint to the prompt
 
     // Advanced parameters state
     let negativePrompt = '';
@@ -43,7 +45,6 @@ export function ImageStudio() {
     let steps = 25;
     let seed = -1;
     let showAdvanced = false;
-    let selectedStyle = 'None';
     let batchCount = 1;
 
     // New advanced controls
@@ -110,8 +111,7 @@ export function ImageStudio() {
             uploadedImageUrls = urls || [url];
             if (!imageMode) {
                 imageMode = true;
-                selectedModel = i2iModels[0].id;
-                selectedModelName = i2iModels[0].name;
+                { const first = pickForStyle(i2iModels, '', selectedStyle); selectedModel = first.id; selectedModelName = first.name; }
                 selectedAr = getAspectRatiosForI2IModel(selectedModel)[0];
                 document.getElementById('model-btn-label').textContent = selectedModelName;
                 document.getElementById('ar-btn-label').textContent = selectedAr;
@@ -127,8 +127,7 @@ export function ImageStudio() {
         onClear: () => {
             uploadedImageUrls = [];
             imageMode = false;
-            selectedModel = t2iModels[0].id;
-            selectedModelName = t2iModels[0].name;
+            { const first = pickForStyle(t2iModels, '', selectedStyle); selectedModel = first.id; selectedModelName = first.name; }
             selectedAr = getAspectRatiosForModel(selectedModel)[0];
             document.getElementById('model-btn-label').textContent = selectedModelName;
             document.getElementById('ar-btn-label').textContent = selectedAr;
@@ -189,6 +188,11 @@ export function ImageStudio() {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="opacity-60 text-secondary"><path d="M6 2L3 6v15a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6z"/></svg>
     `, '720p', 'quality-btn', 'Set output quality');
 
+    const styleBtn = createControlBtn(`
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="opacity-60 text-secondary"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.7-.8 1.7-1.7 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.8-1.7 1.7-1.7h2c3.1 0 5.6-2.5 5.6-5.6C22 6 17.5 2 12 2z"/></svg>
+    `, 'Style: All', 'style-btn', 'Pick a style to see the models that fit it');
+
+    controlsLeft.appendChild(styleBtn);
     controlsLeft.appendChild(modelBtn);
     controlsLeft.appendChild(arBtn);
     controlsLeft.appendChild(qualityBtn);
@@ -321,8 +325,6 @@ export function ImageStudio() {
     // ==========================================
     // 4. ADVANCED OPTIONS PANEL
     // ==========================================
-    const STYLE_PRESETS = ['None', 'Photorealistic', 'Anime', 'Cinematic', 'Oil Painting', 'Watercolor', 'Digital Art', 'Concept Art', 'Cyberpunk'];
-    
     const advancedPanel = document.createElement('div');
     advancedPanel.className = 'w-full max-w-4xl mt-6 animate-fade-in-up hidden';
     advancedPanel.id = 'advanced-panel';
@@ -333,14 +335,6 @@ export function ImageStudio() {
                 <button id="close-adv-btn" class="text-white/40 hover:text-white transition-colors">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
                 </button>
-            </div>
-            
-            <!-- Style Presets -->
-            <div class="flex flex-col gap-2">
-                <label class="text-xs font-bold text-secondary uppercase tracking-wider">Style Preset</label>
-                <div class="flex gap-2 flex-wrap">
-                    ${STYLE_PRESETS.map(s => `<button class="style-preset-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-white/5 text-secondary hover:bg-white/10 transition-all" data-style="${s}">${s}</button>`).join('')}
-                </div>
             </div>
             
             <!-- Negative Prompt -->
@@ -648,18 +642,6 @@ export function ImageStudio() {
         };
     }
     
-    // Style preset handlers
-    advancedPanel.querySelectorAll('.style-preset-btn').forEach(btn => {
-        btn.onclick = () => {
-            selectedStyle = btn.dataset.style;
-            advancedPanel.querySelectorAll('.style-preset-btn').forEach(b => {
-                b.classList.remove('bg-primary/20', 'text-primary', 'border-primary/30');
-                b.classList.add('bg-white/5', 'text-secondary');
-            });
-            btn.classList.add('bg-primary/20', 'text-primary', 'border-primary/30');
-            btn.classList.remove('bg-white/5', 'text-secondary');
-        };
-    });
     // ==========================================
     // 3. DROPDOWNS (Professional implementation)
     // ==========================================
@@ -682,7 +664,7 @@ export function ImageStudio() {
                             <input type="text" id="model-search" placeholder="Search models..." class="bg-transparent border-none text-xs text-white focus:ring-0 w-full p-0">
                         </div>
                     </div>
-                    <div class="text-[10px] font-bold text-secondary uppercase tracking-widest px-3 py-2 shrink-0">Available models</div>
+                    <div class="text-[10px] font-bold text-secondary uppercase tracking-widest px-3 py-2 shrink-0">Available models${selectedStyle !== 'all' ? ` · ${IMAGE_STYLES.find(s => s.id === selectedStyle).label}` : ''}</div>
                     <div id="model-list-container" class="flex flex-col gap-1.5 overflow-y-auto custom-scrollbar pr-1 pb-2"></div>
                 </div>
             `;
@@ -690,7 +672,7 @@ export function ImageStudio() {
 
             const renderModels = (filter = '') => {
                 list.innerHTML = '';
-                const filtered = sortByPriceDesc(getCurrentModels()).filter(m => m.name.toLowerCase().includes(filter.toLowerCase()) || m.id.toLowerCase().includes(filter.toLowerCase()));
+                const filtered = sortByPriceDesc(filterByStyle(getCurrentModels(), selectedStyle)).filter(m => m.name.toLowerCase().includes(filter.toLowerCase()) || m.id.toLowerCase().includes(filter.toLowerCase()));
 
                 filtered.forEach(m => {
                     const item = document.createElement('div');
@@ -709,24 +691,7 @@ export function ImageStudio() {
                     `;
                     item.onclick = (e) => {
                         e.stopPropagation();
-                        selectedModel = m.id;
-                        selectedModelName = m.name;
-                        const availableArs = getCurrentAspectRatios(selectedModel);
-                        selectedAr = availableArs[0];
-                        document.getElementById('model-btn-label').textContent = selectedModelName;
-                        document.getElementById('ar-btn-label').textContent = selectedAr;
-
-                        const validResolutions = getCurrentResolutions(selectedModel);
-                        qualityBtn.style.display = validResolutions.length > 0 ? 'flex' : 'none';
-                        if (validResolutions.length > 0) {
-                            document.getElementById('quality-btn-label').textContent = validResolutions[0];
-                        }
-
-                        // Update picker's max images when switching i2i models
-                        if (imageMode) {
-                            picker.setMaxImages(getMaxImagesForI2IModel(selectedModel));
-                        }
-
+                        applyModel(m);
                         closeDropdown();
                     };
                     list.appendChild(item);
@@ -762,6 +727,30 @@ export function ImageStudio() {
                     e.stopPropagation();
                     selectedAr = r;
                     document.getElementById('ar-btn-label').textContent = r;
+                    closeDropdown();
+                };
+                list.appendChild(item);
+            });
+            dropdown.appendChild(list);
+        } else if (type === 'style') {
+            dropdown.classList.add('max-w-[240px]');
+            dropdown.innerHTML = `<div class="text-[10px] font-bold text-secondary uppercase tracking-widest px-3 py-2 border-b border-white/5 mb-2">Image style</div>`;
+            const list = document.createElement('div');
+            list.className = 'flex flex-col gap-1';
+            const pool = getCurrentModels();
+            IMAGE_STYLES.forEach(st => {
+                const count = filterByStyle(pool, st.id).length;
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between p-3 hover:bg-white/5 rounded-2xl cursor-pointer transition-all group';
+                item.title = st.hint || 'Show every model';
+                item.innerHTML = `<span class="text-xs font-bold text-white opacity-80 group-hover:opacity-100"></span><span class="flex items-center gap-2"><span class="text-[10px] text-muted">${count} model${count === 1 ? '' : 's'}</span>${selectedStyle === st.id ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff2d2d" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}</span>`;
+                item.firstElementChild.textContent = st.label;
+                item.onclick = (e) => {
+                    e.stopPropagation();
+                    selectedStyle = st.id;
+                    document.getElementById('style-btn-label').textContent = `Style: ${st.id === 'all' ? 'All' : st.label}`;
+                    const current = pool.find(m => m.id === selectedModel);
+                    if (!current || !fitsStyle(current, st.id)) applyModel(pickForStyle(pool, selectedModel, st.id));
                     closeDropdown();
                 };
                 list.appendChild(item);
@@ -833,6 +822,15 @@ export function ImageStudio() {
         else {
             dropdownOpen = 'ar';
             showDropdown('ar', arBtn);
+        }
+    };
+
+    styleBtn.onclick = (e) => {
+        e.stopPropagation();
+        if (dropdownOpen === 'style') closeDropdown();
+        else {
+            dropdownOpen = 'style';
+            showDropdown('style', styleBtn);
         }
     };
 
@@ -1094,8 +1092,7 @@ export function ImageStudio() {
         picker.setMaxImages(1);
         // Reset to t2i mode
         imageMode = false;
-        selectedModel = t2iModels[0].id;
-        selectedModelName = t2iModels[0].name;
+        { const first = pickForStyle(t2iModels, '', selectedStyle); selectedModel = first.id; selectedModelName = first.name; }
         selectedAr = getAspectRatiosForModel(selectedModel)[0];
         document.getElementById('model-btn-label').textContent = selectedModelName;
         document.getElementById('ar-btn-label').textContent = selectedAr;
@@ -1114,8 +1111,7 @@ export function ImageStudio() {
         uploadedImageUrls = [];
         if (imageMode) {
             imageMode = false;
-            selectedModel = t2iModels[0].id;
-            selectedModelName = t2iModels[0].name;
+            { const first = pickForStyle(t2iModels, '', selectedStyle); selectedModel = first.id; selectedModelName = first.name; }
             selectedAr = getAspectRatiosForModel(selectedModel)[0];
             document.getElementById('model-btn-label').textContent = selectedModelName;
             document.getElementById('ar-btn-label').textContent = selectedAr;
@@ -1127,6 +1123,19 @@ export function ImageStudio() {
         textarea.placeholder = 'Describe the image you want to create';
         refreshCost();
     };
+
+    // Switch to a model and reset its aspect ratio / resolution controls.
+    function applyModel(m) {
+        selectedModel = m.id;
+        selectedModelName = m.name;
+        selectedAr = getCurrentAspectRatios(selectedModel)[0];
+        document.getElementById('model-btn-label').textContent = selectedModelName;
+        document.getElementById('ar-btn-label').textContent = selectedAr;
+        const validResolutions = getCurrentResolutions(selectedModel);
+        qualityBtn.style.display = validResolutions.length > 0 ? 'flex' : 'none';
+        if (validResolutions.length > 0) document.getElementById('quality-btn-label').textContent = validResolutions[0];
+        if (imageMode) picker.setMaxImages(getMaxImagesForI2IModel(selectedModel));
+    }
 
     // ==========================================
     // 5. GENERATION LOGIC
@@ -1162,6 +1171,8 @@ export function ImageStudio() {
         const model = getCurrentModels().find(m => m.id === submittedModel);
         const cost = model ? costMeta(model, { resolution: qualityField ? qualityLabel : '' }) : {};
         const historyMeta = { prompt, model: submittedModel, aspect_ratio: submittedAr, ...cost };
+        const styleHint = IMAGE_STYLES.find(st => st.id === selectedStyle)?.hint || '';
+        const promptForModel = joinPrompt(prompt, styleHint);
 
         const tempId = queueHistory.addPending(historyMeta);
         textarea.value = '';
@@ -1171,8 +1182,8 @@ export function ImageStudio() {
         const buildParams = (queueRequest) => {
             const params = submittedImageMode
                 ? { model: submittedModel, images_list: submittedImages, image_url: submittedImages[0], aspect_ratio: submittedAr }
-                : { model: submittedModel, prompt, aspect_ratio: submittedAr };
-            if (submittedImageMode && prompt) params.prompt = prompt;
+                : { model: submittedModel, prompt: promptForModel, aspect_ratio: submittedAr };
+            if (submittedImageMode && prompt) params.prompt = promptForModel;
             if (qualityField && qualityLabel) params[qualityField] = qualityLabel;
             if (cost.credits) params.estimatedCredits = cost.credits;
             params.onRequestId = queueRequest;

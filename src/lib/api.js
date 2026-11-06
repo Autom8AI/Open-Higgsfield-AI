@@ -1,5 +1,6 @@
 import { buildVideoParams } from './videoSpecs.js';
 import { REMIX_SPECS } from './remixSpecs.js';
+import { t2iModels, i2iModels } from './models.js';
 // Bridge to the content-factory Netlify function backend (same account,
 // credits and Airtable library). Activated by logging in; falls back to the
 // direct kie.ai client when no session is active.
@@ -113,6 +114,10 @@ const EDIT_MAP = [
 ];
 
 function mapImageId(id, edit) {
+    // Registry ids (what the Image studio lists) go straight through, so e.g.
+    // Ideogram or Nano Banana 2 Lite are not swapped for another model.
+    const list = edit ? i2iModels : t2iModels;
+    if (list.some(m => m.id === id)) return id;
     const table = edit ? EDIT_MAP : IMAGE_MAP;
     for (const [needle, slug] of table) {
         if (String(id).includes(needle)) return slug;

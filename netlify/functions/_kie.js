@@ -231,7 +231,10 @@ async function getTask(taskId, key) {
   const data = await res.json().catch(() => ({}))
   const record = data.data || {}
   let urls = []
-  try { urls = JSON.parse(record.resultJson || '{}').resultUrls || [] } catch {}
+  try {
+    const r = JSON.parse(record.resultJson || '{}')
+    urls = r.resultUrls || r.result_urls || r.data?.result_urls || r.originUrls || r.origin_urls || []
+  } catch {}
   return {
     state: record.state,
     urls,

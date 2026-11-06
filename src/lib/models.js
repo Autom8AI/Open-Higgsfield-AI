@@ -409,6 +409,90 @@ export const t2vModels = [
     ],
     "resolutionDefault": "1080p",
     "hasDuration": true
+  },
+  {
+    "id": "veo-3-1/quality",
+    "label": "Veo 3.1 Quality",
+    "kind": "video",
+    "api": "jobs",
+    "taskModel": "veo-3-1",
+    "inputFixed": {
+      "model": "veo3"
+    },
+    "blurb": "Google Veo 3.1 top tier. Native audio and dialogue, best realism.",
+    "images": {
+      "param": "image_urls",
+      "max": 2,
+      "required": false
+    },
+    "aspects": [
+      "16:9",
+      "9:16",
+      "Auto"
+    ],
+    "resolutions": [
+      "720p",
+      "1080p",
+      "4k"
+    ],
+    "resolutionDefault": "720p",
+    "hasDuration": true
+  },
+  {
+    "id": "veo-3-1/fast",
+    "label": "Veo 3.1 Fast",
+    "kind": "video",
+    "api": "jobs",
+    "taskModel": "veo-3-1",
+    "inputFixed": {
+      "model": "veo3_fast"
+    },
+    "blurb": "Google Veo 3.1 with native audio. Great for UGC and ads.",
+    "images": {
+      "param": "image_urls",
+      "max": 2,
+      "required": false
+    },
+    "aspects": [
+      "16:9",
+      "9:16",
+      "Auto"
+    ],
+    "resolutions": [
+      "720p",
+      "1080p",
+      "4k"
+    ],
+    "resolutionDefault": "720p",
+    "hasDuration": true
+  },
+  {
+    "id": "veo-3-1/lite",
+    "label": "Veo 3.1 Lite",
+    "kind": "video",
+    "api": "jobs",
+    "taskModel": "veo-3-1",
+    "inputFixed": {
+      "model": "veo3_lite"
+    },
+    "blurb": "Cheapest Veo 3.1 tier, with audio.",
+    "images": {
+      "param": "image_urls",
+      "max": 2,
+      "required": false
+    },
+    "aspects": [
+      "16:9",
+      "9:16",
+      "Auto"
+    ],
+    "resolutions": [
+      "720p",
+      "1080p",
+      "4k"
+    ],
+    "resolutionDefault": "720p",
+    "hasDuration": true
   }
 ];
 // Image-to-video: every registry video model that accepts image input

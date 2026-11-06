@@ -98,6 +98,10 @@ const KIE_FROM_PRICES = {
   'kling-2.6/motion-control': [12.6, 'cr/sec'],
   'wan/2-2-animate-move': [6, 'cr/sec'],
   'wan/2-2-animate-replace': [6, 'cr/sec'],
+  // Veo 3.1 per video (kie.ai/veo-3-1, checked 2026-11-06).
+  'veo-3-1/quality': [250, 'cr/video', { '720p': 250, '1080p': 255, '4k': 370 }],
+  'veo-3-1/fast': [60, 'cr/video', { '720p': 60, '1080p': 65, '4k': 180 }],
+  'veo-3-1/lite': [30, 'cr/video', { '720p': 30, '1080p': 35, '4k': 150 }],
   'google/nano-banana': [4, 'cr/image'],
   'nano-banana-2': [8, 'cr/image'],
   'nano-banana-2-lite': [8, 'cr/image'],
@@ -175,7 +179,8 @@ exports.handler = guard('models', async function (event) {
       if (!observed) return model
       // Old runs stored without a duration are per-video averages; they cannot be
       // compared with a per-second price, so keep the published rate for those.
-      if (/sec/.test(model.pricing?.unit || '') && !/sec/.test(observed.unit)) return model
+      // Likewise per-video prices are not comparable with per-second averages.
+      if (model.pricing?.unit && model.pricing.unit !== observed.unit) return model
       if (!model.pricing) return { ...model, pricing: observed }
       return {
         ...model,

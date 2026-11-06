@@ -292,9 +292,10 @@ exports.handler = guard('create', async function (event) {
   if (videos.length && model.videos) input[model.videos.param] = model.videos.single ? videos[0] : videos
   if (model.resolutionParam && input.resolution) { input[model.resolutionParam] = input.resolution; delete input.resolution }
   if (model.noPrompt) delete input.prompt
+  if (model.inputFixed) Object.assign(input, model.inputFixed)
   const base = process.env.URL || process.env.DEPLOY_PRIME_URL
   const cb = base ? `${base}/.netlify/functions/callback` : undefined
-  const taskId = await createTask(modelId, input, cb, keys.kie)
+  const taskId = await createTask(model.taskModel || modelId, input, cb, keys.kie)
   const estimated = Math.max(0, Math.min(100000, Number(body.estimatedCredits) || 0))
   const stored = await storeQueued({ model, prompt, taskId, input, credits: Number(model.credits || 0), accountId: auth.account.id, estimated })
   await trackUsage(auth.account, 'kie', Number(model.credits || 0))

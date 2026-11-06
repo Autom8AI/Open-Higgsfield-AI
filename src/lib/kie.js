@@ -190,7 +190,7 @@ export class KieClient {
 
         // Registry models (ids like "bytedance/seedance-2") are kie market slugs.
         if (String(id).includes('/')) {
-            return { ...info, family: 'jobs', model: id, registry: true, imageParam: registry?.images?.param || (id.includes('happyhorse') ? 'reference_image' : null) };
+            return { ...info, family: 'jobs', model: registry?.taskModel || id, registry: true, imageParam: registry?.images?.param || (id.includes('happyhorse') ? 'reference_image' : null) };
         }
 
         if (id.includes('veo')) {

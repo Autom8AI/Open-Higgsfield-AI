@@ -17,6 +17,10 @@ const seedanceFields = [
     { key: 'web_search', label: 'Web search', type: 'toggle', default: false, when: 't2v', hint: 'Lets the model look up what the prompt mentions' },
 ];
 
+const veoFields = [
+    { key: 'enable_translation', label: 'Translate prompt', type: 'toggle', default: true, hint: 'Translates non-English prompts to English first' },
+];
+
 export const VIDEO_SPECS = {
     'bytedance/seedance-2': {
         durations: range(4, 15), durationDefault: 5, durationType: 'number',
@@ -61,6 +65,11 @@ export const VIDEO_SPECS = {
         imageOnly: true,
         advanced: [],
     },
+    // Veo 3.1 (one kie market model, tier picked by input.model). 1 image = first
+    // frame, 2 images = first + last frame.
+    'veo-3-1/quality': { durations: [4, 6, 8], durationDefault: 8, durationType: 'number', fixed: { model: 'veo3' }, advanced: veoFields },
+    'veo-3-1/fast': { durations: [4, 6, 8], durationDefault: 8, durationType: 'number', fixed: { model: 'veo3_fast' }, advanced: veoFields },
+    'veo-3-1/lite': { durations: [4, 6, 8], durationDefault: 8, durationType: 'number', fixed: { model: 'veo3_lite' }, advanced: veoFields },
 };
 
 export const getVideoSpec = (id) => VIDEO_SPECS[id] || null;

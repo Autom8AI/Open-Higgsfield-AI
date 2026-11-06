@@ -8,6 +8,7 @@ import { createQueueHistory, pendingThumbHtml, creditBadgeHtml, costMeta } from 
 import { advancedFieldsFor } from '../lib/videoSpecs.js';
 import { CAMERA_PRESETS } from '../lib/presets.js';
 import { createCharacterButton } from '../lib/characters.js';
+import { VIDEO_STYLES, fitsStyle, filterByStyle, pickForStyle, joinPrompt } from '../lib/modelStyles.js';
 
 export function VideoStudio() {
     const container = document.createElement('div');
@@ -32,6 +33,7 @@ export function VideoStudio() {
     let uploadedVideoUrl = null;
     let advancedOpen = false;
     let selectedCamera = CAMERA_PRESETS[0];
+    let selectedStyle = 'all'; // filters the model list and adds a style hint to the prompt
     let advancedValues = {}; // per-model values for the Advanced panel, reset on model change
 
     const getCurrentModels = () => v2vMode ? v2vModels : (imageMode ? i2vModels : t2vModels);
@@ -99,7 +101,7 @@ export function VideoStudio() {
             if (!imageMode) {
                 imageMode = true;
                 const keep = i2vModels.find(m => m.id === selectedModel);
-                const next = keep || i2vModels[0];
+                const next = keep || pickForStyle(i2vModels, selectedModel, selectedStyle);
                 if (next) {
                     selectedModel = next.id;
                     selectedModelName = next.name;
@@ -116,7 +118,7 @@ export function VideoStudio() {
             uploadedImageUrl = null;
             imageMode = false;
             const keep = t2vModels.find(m => m.id === selectedModel);
-            const next = keep || t2vModels[0];
+            const next = keep || pickForStyle(t2vModels, selectedModel, selectedStyle);
             selectedModel = next.id;
             selectedModelName = next.name;
             document.getElementById('v-model-btn-label').textContent = selectedModelName;
@@ -184,8 +186,7 @@ export function VideoStudio() {
         uploadedVideoUrl = null;
         v2vMode = false;
         showVideoIcon();
-        selectedModel = t2vModels[0].id;
-        selectedModelName = t2vModels[0].name;
+        { const first = pickForStyle(t2vModels, '', selectedStyle); selectedModel = first.id; selectedModelName = first.name; }
         document.getElementById('v-model-btn-label').textContent = selectedModelName;
         updateControlsForModel(selectedModel);
         textarea.placeholder = 'Describe the video you want to create';
@@ -315,6 +316,11 @@ export function VideoStudio() {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="opacity-60 text-secondary"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
     `, selectedMode || 'normal', 'v-mode-btn');
 
+    const styleBtn = createControlBtn(`
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="opacity-60 text-secondary"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.7-.8 1.7-1.7 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.8-1.7 1.7-1.7h2c3.1 0 5.6-2.5 5.6-5.6C22 6 17.5 2 12 2z"/></svg>
+    `, 'Style: All', 'v-style-btn', 'Pick a style to see the models that fit it');
+
+    controlsLeft.appendChild(styleBtn);
     controlsLeft.appendChild(modelBtn);
     controlsLeft.appendChild(arBtn);
     controlsLeft.appendChild(durationBtn);
@@ -631,7 +637,7 @@ export function VideoStudio() {
                             <input type="text" id="v-model-search" placeholder="Search models..." class="bg-transparent border-none text-xs text-white focus:ring-0 w-full p-0">
                         </div>
                     </div>
-                    <div class="text-[10px] font-bold text-secondary uppercase tracking-widest px-3 py-2 shrink-0">Video models</div>
+                    <div class="text-[10px] font-bold text-secondary uppercase tracking-widest px-3 py-2 shrink-0">Video models${selectedStyle !== 'all' ? ` · ${VIDEO_STYLES.find(s => s.id === selectedStyle).label}` : ''}</div>
                     <div id="v-model-list-container" class="flex flex-col gap-1.5 overflow-y-auto custom-scrollbar pr-1 pb-2"></div>
                 </div>
             `;
@@ -693,7 +699,7 @@ export function VideoStudio() {
 
                 // Regular generation models (always t2v or i2v, never v2v)
                 const generationModels = imageMode ? i2vModels : t2vModels;
-                const filteredMain = sortByPriceDesc(generationModels)
+                const filteredMain = sortByPriceDesc(filterByStyle(generationModels, selectedStyle))
                     .filter(m => m.name.toLowerCase().includes(lf) || m.id.toLowerCase().includes(lf));
                 filteredMain.forEach(m => list.appendChild(makeModelItem(m, false)));
 
@@ -809,6 +815,39 @@ export function VideoStudio() {
             });
             dropdown.appendChild(list);
 
+        } else if (type === 'style') {
+            dropdown.classList.add('max-w-[240px]');
+            dropdown.innerHTML = `<div class="text-[10px] font-bold text-secondary uppercase tracking-widest px-3 py-2 border-b border-white/5 mb-2">Video style</div>`;
+            const list = document.createElement('div');
+            list.className = 'flex flex-col gap-1';
+            const pool = imageMode ? i2vModels : t2vModels;
+            VIDEO_STYLES.forEach(st => {
+                const count = filterByStyle(pool, st.id).length;
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between p-3 hover:bg-white/5 rounded-2xl cursor-pointer transition-all group';
+                item.title = st.hint || 'Show every model';
+                item.innerHTML = `<span class="text-xs font-bold text-white opacity-80 group-hover:opacity-100"></span><span class="flex items-center gap-2"><span class="text-[10px] text-muted">${count} model${count === 1 ? '' : 's'}</span>${selectedStyle === st.id ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff2d2d" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}</span>`;
+                item.firstElementChild.textContent = st.label;
+                item.onclick = (e) => {
+                    e.stopPropagation();
+                    selectedStyle = st.id;
+                    document.getElementById('v-style-btn-label').textContent = `Style: ${st.id === 'all' ? 'All' : st.label}`;
+                    if (!v2vMode) {
+                        const current = pool.find(m => m.id === selectedModel);
+                        if (!current || !fitsStyle(current, st.id)) {
+                            const next = pickForStyle(pool, selectedModel, st.id);
+                            selectedModel = next.id;
+                            selectedModelName = next.name;
+                            document.getElementById('v-model-btn-label').textContent = selectedModelName;
+                            updateControlsForModel(selectedModel);
+                        }
+                    }
+                    closeDropdown();
+                };
+                list.appendChild(item);
+            });
+            dropdown.appendChild(list);
+
         } else if (type === 'camera') {
             dropdown.classList.add('max-w-[240px]');
             dropdown.innerHTML = `<div class="text-[10px] font-bold text-secondary uppercase tracking-widest px-3 py-2 border-b border-white/5 mb-2">Camera move</div>`;
@@ -886,6 +925,7 @@ export function VideoStudio() {
     qualityBtn.onclick = toggleDropdown('quality', qualityBtn);
     modeBtn.onclick = toggleDropdown('mode', modeBtn);
     cameraBtn.onclick = toggleDropdown('camera', cameraBtn);
+    styleBtn.onclick = toggleDropdown('style', styleBtn);
 
     window.addEventListener('click', closeDropdown);
     container.appendChild(dropdown);
@@ -1164,8 +1204,7 @@ export function VideoStudio() {
         uploadedVideoUrl = null;
         v2vMode = false;
         showVideoIcon();
-        selectedModel = t2vModels[0].id;
-        selectedModelName = t2vModels[0].name;
+        { const first = pickForStyle(t2vModels, '', selectedStyle); selectedModel = first.id; selectedModelName = first.name; }
         document.getElementById('v-model-btn-label').textContent = selectedModelName;
         updateControlsForModel(selectedModel);
         textarea.placeholder = 'Describe the video you want to create';
@@ -1204,7 +1243,7 @@ export function VideoStudio() {
         if (imageMode) {
             imageMode = false;
             const keep = t2vModels.find(m => m.id === selectedModel);
-            const next = keep || t2vModels[0];
+            const next = keep || pickForStyle(t2vModels, selectedModel, selectedStyle);
             selectedModel = next.id;
             selectedModelName = next.name;
             document.getElementById('v-model-btn-label').textContent = selectedModelName;
@@ -1263,7 +1302,8 @@ export function VideoStudio() {
         const submittedResolution = selectedResolution;
         const submittedAdvanced = { ...advancedValues };
         // The chosen camera move is added to what the model receives (History keeps the typed prompt).
-        const promptForModel = [prompt, selectedCamera.text].filter(Boolean).join(' ');
+        const styleHint = VIDEO_STYLES.find(s => s.id === selectedStyle)?.hint || '';
+        const promptForModel = joinPrompt(prompt, selectedCamera.text, styleHint);
         const submittedImageMode = imageMode;
         const submittedV2V = v2vMode;
         const submittedImageUrl = uploadedImageUrl;

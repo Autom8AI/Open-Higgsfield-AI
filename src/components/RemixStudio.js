@@ -18,14 +18,15 @@ import { createCharacterButton } from '../lib/characters.js';
 
 const modelObj = (id) => ({ id, name: REMIX_LABELS[id] || id });
 
-export function RemixStudio() {
+export function RemixStudio({ fixedMode } = {}) {
     const container = document.createElement('div');
     container.className = 'w-full h-full overflow-y-auto custom-scrollbar bg-app-bg px-4 md:px-10 py-8';
 
     loadPricing().then(() => { refreshModelSelect(); refreshCost(); });
 
     // --- State ---
-    let mode = REMIX_MODES[0];
+    // fixedMode: opened from the Video tab's Tool menu, so the mode is already chosen.
+    let mode = REMIX_MODES.find(m => m.id === fixedMode) || REMIX_MODES[0];
     let modelId = modelsForMode(mode.id)[0];
     let resolution = REMIX_SPECS[modelId].resolutionDefault;
     let extra = {};
@@ -39,6 +40,11 @@ export function RemixStudio() {
     head.innerHTML = `
         <h1 class="text-3xl md:text-5xl font-black tracking-tight text-white mb-2">Remix</h1>
         <p class="text-sm text-secondary">Start from a video you already have. Move your own character with its motion, or change one thing and keep the shot.</p>`;
+    if (fixedMode) {
+        head.innerHTML = '<h1 class="text-3xl md:text-5xl font-black tracking-tight text-white mb-2"></h1><p class="text-sm text-secondary"></p>';
+        head.children[0].textContent = mode.label;
+        head.children[1].textContent = `${mode.blurb} ${mode.needs}`;
+    }
     container.appendChild(head);
 
     const wrap = document.createElement('div');
@@ -62,7 +68,7 @@ export function RemixStudio() {
     const modeRow = document.createElement('div');
     modeRow.className = 'grid grid-cols-1 sm:grid-cols-3 gap-3';
     modeBlock.appendChild(modeRow);
-    card.appendChild(modeBlock);
+    if (!fixedMode) card.appendChild(modeBlock);
 
     function paintModes() {
         modeRow.innerHTML = '';

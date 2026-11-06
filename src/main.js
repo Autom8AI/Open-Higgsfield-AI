@@ -1,6 +1,5 @@
 import './style.css';
 import { Header } from './components/Header.js';
-import { ImageStudio } from './components/ImageStudio.js';
 import { BackendModal } from './components/BackendModal.js';
 
 const app = document.querySelector('#app');
@@ -9,14 +8,18 @@ let booted = false;
 
 // Router. Pages load on demand; a navigation token makes sure only the most
 // recent page is shown even if an older page's code finishes loading later.
+const videoHub = (tool) => () => import('./components/ToolHub.js').then(m => () => m.ToolHub({ tools: m.VIDEO_TOOLS, storageKey: 'video_tool', initial: tool, label: 'Tool' }));
+const imageHub = (tool) => () => import('./components/ToolHub.js').then(m => () => m.ToolHub({ tools: m.IMAGE_TOOLS, storageKey: 'image_tool', initial: tool, label: 'Tool' }));
+// Video and Image are hubs with a Tool menu; the old page names open the matching tool.
 const PAGES = {
-  video: () => import('./components/VideoStudio.js').then(m => m.VideoStudio),
-  factory: () => import('./components/FactoryStudio.js').then(m => m.FactoryStudio),
-  remix: () => import('./components/RemixStudio.js').then(m => m.RemixStudio),
+  video: videoHub(),
+  image: imageHub(),
+  remix: videoHub('motion'),
+  lipsync: videoHub('lipsync'),
+  factory: videoHub('factory'),
+  cinema: imageHub('cinema'),
   characters: () => import('./components/CharactersPage.js').then(m => m.CharactersPage),
   library: () => import('./components/LibraryPage.js').then(m => m.LibraryPage),
-  cinema: () => import('./components/CinemaStudio.js').then(m => m.CinemaStudio),
-  lipsync: () => import('./components/LipSyncStudio.js').then(m => m.LipSyncStudio),
 };
 let navToken = 0;
 
@@ -25,10 +28,6 @@ function navigate(page) {
   const token = ++navToken;
   contentArea.innerHTML = '';
 
-  if (page === 'image') {
-    contentArea.appendChild(ImageStudio());
-    return;
-  }
   const load = PAGES[page];
   if (!load) return;
   load().then((Page) => {

@@ -27,6 +27,7 @@ function localPlaceholders(items) {
             credits: j.historyMeta?.credits ?? null,
             creditStatus: 'estimated',
             duration: j.historyMeta?.duration || null,
+            voice: j.historyMeta?.voice ? { name: j.historyMeta.voice } : null,
             createdAt: new Date(j.submittedAt || Date.now()).toISOString(),
         }));
 }
@@ -147,7 +148,7 @@ function openPreview(item) {
         <div class="flex items-center justify-between gap-4 px-4 md:px-8 py-4">
             <div class="min-w-0">
                 <p class="text-sm font-bold text-white truncate">${esc(item.model) || 'unknown model'}</p>
-                <p class="text-[11px] text-secondary truncate">${kindLabel(item)} · ${timeAgo(item.createdAt)}${item.credits ? ` · ${creditText(item)}` : ''}${item.duration ? ` · ${esc(item.duration)}s` : ''}${item.resolution ? ` · ${esc(item.resolution)}` : ''}</p>
+                <p class="text-[11px] text-secondary truncate">${kindLabel(item)} · ${timeAgo(item.createdAt)}${item.credits ? ` · ${creditText(item)}` : ''}${item.duration ? ` · ${esc(item.duration)}s` : ''}${item.resolution ? ` · ${esc(item.resolution)}` : ''}${item.voice?.name ? ` · voice: ${esc(item.voice.name)}${item.voice.provider === 'elevenlabs' ? ' (your ElevenLabs)' : ''}` : ''}</p>
             </div>
             <button data-close class="shrink-0 w-10 h-10 rounded-full bg-white/10 hover:bg-[#ff2d2d] text-white flex items-center justify-center transition-colors" title="Close">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>

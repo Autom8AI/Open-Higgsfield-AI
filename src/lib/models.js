@@ -233,7 +233,7 @@ export const t2vModels = [
     "blurb": "Flagship video. Billed per second.",
     "images": {
       "param": "reference_image_urls",
-      "max": 10,
+      "max": 9,
       "required": false
     },
     "aspects": [
@@ -262,7 +262,7 @@ export const t2vModels = [
     "blurb": "Faster Seedance 2 tier.",
     "images": {
       "param": "reference_image_urls",
-      "max": 10,
+      "max": 9,
       "required": false
     },
     "aspects": [

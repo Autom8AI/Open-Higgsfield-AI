@@ -239,7 +239,7 @@
       "blurb": "Flagship video. Billed per second.",
       "images": {
         "param": "reference_image_urls",
-        "max": 10,
+        "max": 9,
         "required": false
       },
       "aspects": [
@@ -258,7 +258,11 @@
         "4k"
       ],
       "resolutionDefault": "720p",
-      "hasDuration": true
+      "hasDuration": true,
+      "audios": {
+        "param": "reference_audio_urls",
+        "max": 3
+      }
     },
     {
       "id": "bytedance/seedance-2-fast",
@@ -268,7 +272,7 @@
       "blurb": "Faster Seedance 2 tier.",
       "images": {
         "param": "reference_image_urls",
-        "max": 10,
+        "max": 9,
         "required": false
       },
       "aspects": [
@@ -285,7 +289,11 @@
         "720p"
       ],
       "resolutionDefault": "720p",
-      "hasDuration": true
+      "hasDuration": true,
+      "audios": {
+        "param": "reference_audio_urls",
+        "max": 3
+      }
     },
     {
       "id": "bytedance/seedance-1.5-pro",

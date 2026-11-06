@@ -7,6 +7,8 @@
 import { kie } from '../lib/kie.js';
 import { listCharacters, compressImage } from '../lib/characters.js';
 import { esc } from '../lib/resultCards.js';
+import { listVoices, saveVoiceKey, removeVoiceKey } from '../lib/api.js';
+import { voiceCredits, voiceSeconds } from '../lib/modelStyles.js';
 
 const GROUPS = {
     character: { label: 'Character', noun: 'Character', icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0112 0v1"/></svg>', tip: 'Keeps a face and body the same' },
@@ -15,12 +17,15 @@ const GROUPS = {
 
 let seq = 0;
 
-export function createSetupPanel({ styles, onChange }) {
+export function createSetupPanel({ styles, onChange, withSound = false }) {
     const state = {
         style: 'any',
         character: { on: false, entries: [] },
         item: { on: false, entries: [] },
         limit: null, // { max, model } from the studio for the "up to N photos" line
+        sound: 'model', // model | voiceover | silent (Video only)
+        voice: null,    // { id, name, source: 'preset' | 'mine', preview }
+        script: '',
     };
 
     const el = document.createElement('div');
@@ -89,6 +94,184 @@ export function createSetupPanel({ styles, onChange }) {
                 : `${n} photo${n === 1 ? '' : 's'}`;
             el.appendChild(line);
         }
+
+        if (withSound) {
+            const snd = row('3 · Sound');
+            [['model', 'Model sound', 'The model makes its own sound and speech'], ['voiceover', 'Voiceover', 'Your script, spoken in an ElevenLabs voice (incl. your cloned voices)'], ['silent', 'Silent', 'No audio']]
+                .forEach(([id, text, tip]) => snd.body.appendChild(chip(text, state.sound === id, () => {
+                    state.sound = id;
+                    if (id === 'voiceover') loadVoices();
+                    changed();
+                }, tip)));
+            el.appendChild(snd.r);
+            if (state.sound === 'voiceover') el.appendChild(voiceTray());
+        }
+    }
+
+    // ---------- voiceover ----------
+    let voices = null; // { voices, mine, hasElevenKey, mineError }
+    let voicesLoading = false;
+    let voiceError = '';
+    const player = new Audio();
+
+    async function loadVoices(force = false) {
+        if ((voices && !force) || voicesLoading) return;
+        voicesLoading = true;
+        try {
+            voices = await listVoices();
+            voiceError = '';
+            if (!state.voice) {
+                const first = voices.mine?.[0] ? { ...voices.mine[0], source: 'mine' } : (voices.voices?.[0] ? { ...voices.voices[0], source: 'preset' } : null);
+                state.voice = first;
+            }
+        } catch (e) {
+            voiceError = e.message;
+        }
+        voicesLoading = false;
+        changed();
+    }
+
+    function preview(url) {
+        if (!url) return;
+        if (!player.paused && player.src === url) { player.pause(); return; }
+        player.src = url;
+        player.play().catch(() => {});
+    }
+
+    function voiceTray() {
+        const box = document.createElement('div');
+        box.className = 'sm:ml-[6.75rem] flex flex-col gap-2 bg-black/20 border border-white/5 rounded-2xl p-3';
+        if (voicesLoading && !voices) {
+            box.innerHTML = '<div class="text-xs text-secondary">Loading voices…</div>';
+            return box;
+        }
+        if (voiceError) {
+            const m = document.createElement('div');
+            m.className = 'text-xs text-[#ff6b6b]';
+            m.textContent = `Could not load voices: ${voiceError}`;
+            box.appendChild(m);
+            return box;
+        }
+
+        // Voice picker
+        const top = document.createElement('div');
+        top.className = 'flex items-center gap-2 flex-wrap';
+        const wrap = document.createElement('div');
+        wrap.className = 'relative';
+        const pick = smallBtn(state.voice ? `${state.voice.name}${state.voice.source === 'mine' ? ' (yours)' : ''} ▾` : 'Pick a voice ▾');
+        pick.classList.remove('border-dashed');
+        const pop = document.createElement('div');
+        pop.className = 'hidden absolute top-[110%] left-0 z-[70] w-72 max-h-80 overflow-y-auto custom-scrollbar bg-[#111] border border-white/10 rounded-2xl p-2 shadow-3xl';
+        wrap.append(pick, pop);
+        document.addEventListener('click', (e) => { if (!wrap.contains(e.target)) pop.classList.add('hidden'); });
+        const section = (title, list, source) => {
+            const h = document.createElement('div');
+            h.className = 'text-[10px] font-bold uppercase tracking-widest text-secondary px-2 pt-2 pb-1';
+            h.textContent = title;
+            pop.appendChild(h);
+            list.forEach(v => {
+                const item = document.createElement('div');
+                item.className = `flex items-center gap-2 p-2 rounded-xl cursor-pointer ${state.voice?.id === v.id ? 'bg-primary/10' : 'hover:bg-white/5'}`;
+                item.innerHTML = `<button type="button" class="w-6 h-6 shrink-0 rounded-full bg-white/10 text-[9px] text-white" title="Preview">▶</button><span class="flex flex-col min-w-0"><span class="text-xs font-bold text-white truncate">${esc(v.name)}</span><span class="text-[10px] text-secondary truncate">${esc(v.desc || '')}</span></span>`;
+                item.firstElementChild.onclick = (e) => { e.stopPropagation(); preview(v.preview); };
+                item.onclick = (e) => { e.stopPropagation(); state.voice = { ...v, source }; pop.classList.add('hidden'); changed(); };
+                pop.appendChild(item);
+            });
+        };
+        pick.onclick = (e) => {
+            e.stopPropagation();
+            pop.innerHTML = '';
+            if (voices.mine?.length) section('Your voices', voices.mine, 'mine');
+            else if (voices.hasElevenKey) {
+                const n = document.createElement('div');
+                n.className = 'text-[11px] text-secondary px-2 py-2';
+                n.textContent = voices.mineError ? `Could not load your voices: ${voices.mineError}` : 'No cloned voices on your ElevenLabs account yet.';
+                pop.appendChild(n);
+            }
+            section('ElevenLabs voices', voices.voices || [], 'preset');
+            pop.classList.toggle('hidden');
+        };
+        top.appendChild(wrap);
+        if (state.voice?.preview) {
+            const pv = smallBtn('▶ Preview');
+            pv.classList.remove('border-dashed');
+            pv.onclick = (e) => { e.stopPropagation(); preview(state.voice.preview); };
+            top.appendChild(pv);
+        }
+        box.appendChild(top);
+
+        // Script
+        const script = document.createElement('textarea');
+        script.rows = 2;
+        script.maxLength = 1000;
+        script.value = state.script;
+        script.placeholder = 'What should be said? Keep it under ~15 seconds (about 200 characters).';
+        script.className = 'w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted focus:outline-none focus:border-primary/50 resize-none';
+        script.onclick = (e) => e.stopPropagation();
+        const meter = document.createElement('div');
+        meter.className = 'text-[10px] text-muted';
+        const paintMeter = () => {
+            const n = state.script.length;
+            const secs = voiceSeconds(n);
+            const cost = state.voice?.source === 'mine' ? 'billed to your ElevenLabs plan' : `≈ ${voiceCredits(n)} cr`;
+            meter.textContent = n ? `${n} characters · ≈ ${secs}s of speech · ${cost}${secs > 15 ? ' — too long for one clip (15s max)' : ''}` : 'The video is made at least as long as the voiceover (max 15s).';
+            meter.classList.toggle('text-[#ff6b6b]', secs > 15);
+        };
+        script.oninput = () => { state.script = script.value; paintMeter(); onChange?.(); };
+        paintMeter();
+        box.append(script, meter);
+
+        // Cloned voices: connect the account's own ElevenLabs key.
+        const keyRow = document.createElement('div');
+        keyRow.className = 'flex items-center gap-2 flex-wrap text-[11px]';
+        if (voices.hasElevenKey) {
+            const t = document.createElement('span');
+            t.className = 'text-secondary';
+            t.textContent = 'ElevenLabs connected — your cloned voices are listed under "Your voices".';
+            const off = document.createElement('button');
+            off.type = 'button';
+            off.className = 'text-secondary hover:text-primary underline';
+            off.textContent = 'Disconnect';
+            off.onclick = async (e) => {
+                e.stopPropagation();
+                off.textContent = 'Disconnecting…';
+                try { await removeVoiceKey(); if (state.voice?.source === 'mine') state.voice = null; await loadVoices(true); } catch (err) { off.textContent = `Failed: ${err.message}`; }
+            };
+            keyRow.append(t, off);
+        } else {
+            const t = document.createElement('span');
+            t.className = 'text-secondary';
+            t.textContent = 'Use your cloned voice:';
+            const input = document.createElement('input');
+            input.type = 'password';
+            input.autocomplete = 'off';
+            input.placeholder = 'ElevenLabs API key';
+            input.className = 'w-48 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-primary/50';
+            input.onclick = (e) => e.stopPropagation();
+            const save = smallBtn('Connect');
+            save.classList.remove('border-dashed');
+            const msg = document.createElement('span');
+            msg.className = 'text-secondary';
+            save.onclick = async (e) => {
+                e.stopPropagation();
+                if (!input.value.trim()) return;
+                save.textContent = 'Checking…';
+                try {
+                    await saveVoiceKey(input.value.trim());
+                    input.value = '';
+                    await loadVoices(true);
+                    const mine = voices?.mine?.[0];
+                    if (mine) { state.voice = { ...mine, source: 'mine' }; changed(); }
+                } catch (err) {
+                    save.textContent = 'Connect';
+                    msg.className = 'text-[#ff6b6b]';
+                    msg.textContent = err.message;
+                }
+            };
+            keyRow.append(t, input, save, msg);
+        }
+        box.appendChild(keyRow);
+        return box;
     }
 
     function tray(key) {
@@ -268,6 +451,9 @@ export function createSetupPanel({ styles, onChange }) {
             characters: summarize('character'),
             items: summarize('item'),
             uploading: [...activeEntries('character'), ...activeEntries('item')].some(e => e.photos.some(p => p.uploading)),
+            sound: withSound ? state.sound : 'model',
+            voice: state.sound === 'voiceover' ? state.voice : null,
+            script: state.sound === 'voiceover' ? state.script.trim() : '',
         };
     }
 

@@ -165,6 +165,8 @@ function videoPayload(params) {
         prompt: params.prompt,
         images: built.images,
         videos: [],
+        audios: params.reference_audio_urls || [],
+        ...(params.voice ? { voice: params.voice } : {}),
         params: built.params
     };
 }
@@ -267,4 +269,28 @@ export async function resumePoll(requestId, maxAttempts = 300, interval = 2000) 
 export async function getTaskResult(requestId) {
     const taskId = String(requestId).replace(/^cf:/, '');
     return pollBackend(taskId, 1, 0).catch(() => null);
+}
+
+// ---- Voice (ElevenLabs) ----
+export async function listVoices() {
+    return request('/voices');
+}
+
+export async function saveVoiceKey(key) {
+    return request('/voice-key', { method: 'POST', body: JSON.stringify({ key }) });
+}
+
+export async function removeVoiceKey() {
+    return request('/voice-key', { method: 'DELETE' });
+}
+
+// Makes the voiceover mp3 and returns its public URL. Preset voices run as a
+// kie.ai task (polled here); cloned voices come back straight away.
+export async function makeVoiceover({ text, voiceId, source }) {
+    const json = await request('/voiceover', { method: 'POST', body: JSON.stringify({ text, voiceId, source }) });
+    if (json.url) return json.url;
+    const result = await pollBackend(json.taskId, 120, 2000);
+    const url = result.resultUrls?.[0] || result.url;
+    if (!url) throw new Error('Voiceover finished without audio.');
+    return url;
 }

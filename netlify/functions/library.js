@@ -156,6 +156,10 @@ exports.handler = guard('library', async function (event) {
     const hasEstimate = !hasCredits && Number.isFinite(estimateValue) && estimateValue > 0
     const ready = Boolean(attachment?.url) || ['ready', 'success', 'completed'].includes(state)
     const duration = Number(params.duration || params._duration || 0) || null
+    // A kie preset voiceover is billed separately; add its estimate to the video's cost.
+    const voice = params._voice && typeof params._voice === 'object' ? params._voice : null
+    const voiceCredits = voice && voice.provider === 'kie' ? Number(voice.credits) || 0 : 0
+    const baseCredits = hasCredits ? creditValue : (hasEstimate ? estimateValue : 0)
 
     return {
       id: record.id,
@@ -171,7 +175,8 @@ exports.handler = guard('library', async function (event) {
       sourceUrl: /^https?:\/\//i.test(String(fields['Source URL'] || '')) ? fields['Source URL'] : '',
       mime: attachment?.type || '',
       provider,
-      credits: hasCredits ? creditValue : (hasEstimate ? estimateValue : null),
+      credits: baseCredits || voiceCredits ? Math.round((baseCredits + voiceCredits) * 10) / 10 : null,
+      voice: voice ? { name: voice.name, provider: voice.provider, credits: voiceCredits } : null,
       creditStatus: hasCredits ? (ready ? 'actual' : 'estimated') : (hasEstimate ? 'estimated' : 'unknown'),
       costUsd: provider === 'fal' && hasCredits ? Math.round((creditValue / 100) * 1000) / 1000 : null,
       duration,

@@ -29,17 +29,17 @@ const ALL_IMAGE = ['realistic', 'ugc', 'cartoon', 'product', 'design'];
 
 const FIT = {
     // ---- Video ----
-    'veo-3-1/quality': { styles: ['realistic', 'cinematic', 'ugc', 'product'], tier: 'premium', refs: 0, note: 'Best realism, with sound' },
-    'bytedance/seedance-2': { styles: ALL_VIDEO, tier: 'premium', refs: 10, note: 'Up to 10 reference photos, strongest lock' },
+    'veo-3-1/quality': { alwaysSound: true, styles: ['realistic', 'cinematic', 'ugc', 'product'], tier: 'premium', refs: 0, note: 'Best realism, with sound' },
+    'bytedance/seedance-2': { styles: ALL_VIDEO, tier: 'premium', refs: 9, voice: true, note: 'Up to 9 reference photos, takes your voiceover' },
     'kling-3.0/video': { styles: ['realistic', 'cinematic', 'ugc', 'product'], tier: 'premium', refs: 0, note: 'Sharp, natural motion' },
-    'veo-3-1/fast': { styles: ['realistic', 'cinematic', 'ugc', 'product'], tier: 'standard', refs: 3, refDuration: 8, note: 'Veo with up to 3 reference photos' },
+    'veo-3-1/fast': { alwaysSound: true, styles: ['realistic', 'cinematic', 'ugc', 'product'], tier: 'standard', refs: 3, refDuration: 8, note: 'Veo with up to 3 reference photos' },
     'bytedance/seedance-1.5-pro': { styles: ['realistic', 'cinematic'], tier: 'standard', refs: 0, note: 'Cinematic, with audio' },
     'happyhorse-1-1/reference-to-video': { styles: ['ugc', 'product', 'cartoon'], tier: 'standard', refs: 5, note: 'Places a product or character from photos' },
     'kling/v3-turbo-text-to-video': { styles: ['cinematic', 'cartoon'], tier: 'standard', refs: 0, note: 'Quick, stylised' },
     'wan/2-5-text-to-video': { styles: ['cartoon'], tier: 'standard', refs: 0, note: 'Good for animation' },
     'happyhorse-1-1/text-to-video': { styles: ['cartoon', 'ugc'], tier: 'standard', refs: 0, note: '' },
-    'veo-3-1/lite': { styles: ['realistic', 'ugc'], tier: 'budget', refs: 3, refDuration: 8, note: 'Cheapest Veo' },
-    'bytedance/seedance-2-fast': { styles: ALL_VIDEO, tier: 'budget', refs: 10, note: 'Cheaper Seedance for drafts' },
+    'veo-3-1/lite': { alwaysSound: true, styles: ['realistic', 'ugc'], tier: 'budget', refs: 3, refDuration: 8, note: 'Cheapest Veo' },
+    'bytedance/seedance-2-fast': { styles: ALL_VIDEO, tier: 'budget', refs: 9, voice: true, note: 'Cheaper Seedance for drafts' },
     // ---- Image ----
     'nano-banana-pro': { styles: ['realistic', 'ugc', 'product', 'design'], tier: 'premium', refs: 14, note: 'Best at keeping faces and products identical' },
     'gpt-image-2-text-to-image': { styles: ALL_IMAGE, tier: 'premium', refs: 0, note: 'Follows prompts closely, clean text' },
@@ -60,7 +60,7 @@ export const fitInfo = (id) => FIT[id] || null;
  * `fit` (note, refs) and `overLimit` when it cannot take that many photos.
  * setup = { style, locks: boolean, refCount: number }
  */
-export function fitModels(models, { style = 'any', locks = false, refCount = 0 } = {}) {
+export function fitModels(models, { style = 'any', locks = false, refCount = 0, sound = 'model' } = {}) {
     const seen = new Set();
     const out = [];
     for (const m of models) {
@@ -68,11 +68,13 @@ export function fitModels(models, { style = 'any', locks = false, refCount = 0 }
         seen.add(m.id);
         const fit = FIT[m.id];
         if (!fit) {
-            if (style === 'any' && !locks) out.push({ model: m, fit: null, overLimit: false, rank: 9 });
+            if (style === 'any' && !locks && sound === 'model') out.push({ model: m, fit: null, overLimit: false, rank: 9 });
             continue;
         }
         if (style !== 'any' && (!fit.styles.includes(style) || fit.tier === 'budget')) continue;
         if (locks && !fit.refs) continue;
+        if (sound === 'voiceover' && !fit.voice) continue; // only models that take an audio track
+        if (sound === 'silent' && fit.alwaysSound) continue; // Veo always adds sound
         out.push({ model: m, fit, overLimit: locks && refCount > fit.refs, rank: TIER_RANK[fit.tier] ?? 5 });
     }
     // Within a tier keep the order of FIT above; models over the photo limit go last.
@@ -114,3 +116,10 @@ export const joinPrompt = (...parts) => parts
     .map(p => String(p || '').trim()).filter(Boolean)
     .map((p, i, a) => (i < a.length - 1 && !/[.!?]$/.test(p) ? `${p}.` : p))
     .join(' ');
+
+// Rough kie.ai price of a preset ElevenLabs voiceover (multilingual v2,
+// ~12 credits per 1,000 characters). Cloned voices use the account's own
+// ElevenLabs plan instead, so they cost no kie credits.
+export const voiceCredits = (chars) => Math.max(1, Math.round((Number(chars) || 0) * 0.012 * 10) / 10);
+// ElevenLabs speaks ~15 characters per second.
+export const voiceSeconds = (chars) => Math.round(((Number(chars) || 0) / 15) * 10) / 10;

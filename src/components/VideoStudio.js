@@ -7,7 +7,8 @@ import { sortByPriceDesc, loadPricing, priceChipHtml, costText } from '../lib/mo
 import { createQueueHistory, pendingThumbHtml, creditBadgeHtml, costMeta } from '../lib/studioQueue.js';
 import { advancedFieldsFor } from '../lib/videoSpecs.js';
 import { CAMERA_PRESETS } from '../lib/presets.js';
-import { VIDEO_STYLES, fitModels, pickBest, fitInfo, lockInstruction, joinPrompt } from '../lib/modelStyles.js';
+import { VIDEO_STYLES, fitModels, pickBest, fitInfo, lockInstruction, joinPrompt, voiceCredits, voiceSeconds } from '../lib/modelStyles.js';
+import { makeVoiceover } from '../lib/api.js';
 import { createSetupPanel } from './SetupPanel.js';
 import { esc } from '../lib/resultCards.js';
 
@@ -97,7 +98,7 @@ export function VideoStudio() {
     const bar = document.createElement('div');
     bar.className = 'w-full bg-[#111]/90 backdrop-blur-xl border border-white/10 rounded-[1.5rem] md:rounded-[2.5rem] p-3 md:p-5 flex flex-col gap-3 md:gap-5 shadow-3xl';
 
-    setup = createSetupPanel({ styles: VIDEO_STYLES, onChange: () => onSetupChange() });
+    setup = createSetupPanel({ styles: VIDEO_STYLES, withSound: true, onChange: () => onSetupChange() });
     bar.appendChild(setup.element);
 
     const topRow = document.createElement('div');
@@ -373,7 +374,12 @@ export function VideoStudio() {
     const refreshCost = () => {
         if (v2vMode) { costEl.textContent = ''; return; }
         const model = getCurrentModel();
-        costEl.textContent = model ? costText(model, { duration: selectedDuration, resolution: selectedResolution }) : '';
+        let text = model ? costText(model, { duration: selectedDuration, resolution: selectedResolution }) : '';
+        const st = setup?.getState();
+        if (text && st?.sound === 'voiceover' && st.voice) {
+            text += st.voice.source === 'mine' ? ' + your ElevenLabs voice' : ` + ≈ ${voiceCredits(st.script.length || 150)} cr voice`;
+        }
+        costEl.textContent = text;
     };
     loadPricing().then(refreshCost);
 
@@ -634,7 +640,8 @@ export function VideoStudio() {
     // What gets added to the typed prompt (History keeps only the typed text).
     const extraPrompt = () => {
         const st = setup.getState();
-        return joinPrompt(selectedCamera.text, st.styleHint, st.locks ? lockInstruction(st.characters, st.items) : '');
+        const voiceLine = st.sound === 'voiceover' ? 'The on-screen speaker says exactly the words in reference audio 1, in that voice, with natural lip sync.' : '';
+        return joinPrompt(selectedCamera.text, st.styleHint, st.locks ? lockInstruction(st.characters, st.items) : '', voiceLine);
     };
     const refreshAlsoSent = () => {
         const extra = extraPrompt();
@@ -654,7 +661,7 @@ export function VideoStudio() {
         picker.trigger.style.display = st.locks ? 'none' : '';
         if (st.locks && imageMode) { picker.reset(); uploadedImageUrl = null; imageMode = false; }
         if (!v2vMode) {
-            const best = pickBest(fitModels(getCurrentModels(), { style: st.style, locks: st.locks, refCount: st.refCount }), selectedModel);
+            const best = pickBest(fitModels(getCurrentModels(), { style: st.style, locks: st.locks, refCount: st.refCount, sound: st.sound }), selectedModel);
             if (best && best.id !== selectedModel) {
                 selectedModel = best.id;
                 selectedModelName = best.name;
@@ -663,6 +670,7 @@ export function VideoStudio() {
             updateControlsForModel(selectedModel, true);
         }
         syncSetup();
+        refreshCost();
     };
 
     const showDropdown = (type, anchorBtn) => {
@@ -746,7 +754,7 @@ export function VideoStudio() {
 
                 // Only the models that suit the look and locks, best first.
                 const st = setup.getState();
-                const results = fitModels(v2vMode ? (imageMode ? i2vModels : t2vModels) : getCurrentModels(), { style: st.style, locks: st.locks, refCount: st.refCount })
+                const results = fitModels(v2vMode ? (imageMode ? i2vModels : t2vModels) : getCurrentModels(), { style: st.style, locks: st.locks, refCount: st.refCount, sound: st.sound })
                     .filter(r => r.model.name.toLowerCase().includes(lf) || r.model.id.toLowerCase().includes(lf));
                 results.forEach(r => {
                     const item = makeModelItem(r.model, false, r);
@@ -1311,6 +1319,13 @@ export function VideoStudio() {
         }
 
         const lockState = setup.getState();
+        if (!v2vMode && lockState.sound === 'voiceover') {
+            if (!localStorage.getItem('cf_backend')) { alert('Voiceover needs you signed in to your account.'); return; }
+            if (!lockState.voice) { alert('Pick a voice for the voiceover.'); return; }
+            if (!lockState.script) { alert('Write what the voiceover should say.'); return; }
+            if (voiceSeconds(lockState.script.length) > 15) { alert('The voiceover is longer than 15 seconds. Shorten the script.'); return; }
+            if (!fitInfo(selectedModel)?.voice) { alert(`${selectedModelName} cannot use a voiceover. Pick Seedance 2.0.`); return; }
+        }
         if (!v2vMode && lockState.locks) {
             if (lockState.uploading) { alert('Photos are still uploading — one moment.'); return; }
             if (!lockState.refCount) { alert('Add at least one photo to the character/item lock, or turn the lock off.'); return; }
@@ -1333,6 +1348,14 @@ export function VideoStudio() {
         const submittedDuration = selectedDuration;
         const submittedResolution = selectedResolution;
         const submittedAdvanced = { ...advancedValues };
+        // Sound step: silent turns model audio off; a voiceover keeps it on so the speech is heard.
+        const soundState = setup.getState();
+        if (soundState.sound === 'silent') { submittedAdvanced.generate_audio = false; submittedAdvanced.sound = false; }
+        if (soundState.sound === 'voiceover') submittedAdvanced.generate_audio = true;
+        const submittedVoice = soundState.sound === 'voiceover' && soundState.voice
+            ? { id: soundState.voice.id, name: soundState.voice.name, source: soundState.voice.source, script: soundState.script }
+            : null;
+        const submittedVoiceCredits = submittedVoice && submittedVoice.source === 'preset' ? voiceCredits(submittedVoice.script.length) : 0;
         // The chosen camera move is added to what the model receives (History keeps the typed prompt).
         const setupState = setup.getState();
         const promptForModel = joinPrompt(prompt, extraPrompt());
@@ -1345,7 +1368,8 @@ export function VideoStudio() {
         const cost = model ? costMeta(model, { duration: submittedDuration, resolution: submittedResolution }) : {};
         const historyMeta = submittedV2V
             ? { prompt: '', model: submittedModel, ...cost }
-            : { prompt, model: submittedModel, aspect_ratio: submittedAr, duration: submittedDuration, ...cost };
+            : { prompt, model: submittedModel, aspect_ratio: submittedAr, duration: submittedDuration, ...cost,
+                ...(submittedVoice ? { voice: submittedVoice.name, credits: cost.credits != null ? Math.round((cost.credits + submittedVoiceCredits) * 10) / 10 : cost.credits } : {}) };
         let queuedId = null;
 
         const tempId = queueHistory.addPending(historyMeta);
@@ -1353,11 +1377,39 @@ export function VideoStudio() {
         textarea.style.height = 'auto';
         resetInputs();
 
-        const runJob = (queueRequest) => {
+        // Makes the voiceover first (when chosen) and returns what the video request needs.
+        const prepareVoice = async () => {
+            if (!submittedVoice) return null;
+            const url = await makeVoiceover({ text: submittedVoice.script, voiceId: submittedVoice.id, source: submittedVoice.source });
+            const secs = await new Promise((resolve) => {
+                const a = new Audio();
+                a.preload = 'metadata';
+                a.onloadedmetadata = () => resolve(a.duration || 0);
+                a.onerror = () => resolve(0);
+                a.src = url;
+            });
+            if (secs > 15) throw new Error(`The voiceover is ${Math.round(secs)}s; 15s is the most one clip can take. Shorten the script.`);
+            return {
+                url,
+                secs,
+                meta: { name: submittedVoice.name, provider: submittedVoice.source === 'mine' ? 'elevenlabs' : 'kie', chars: submittedVoice.script.length, credits: submittedVoiceCredits },
+            };
+        };
+        const withVoice = (p, voice) => {
+            if (!voice) return p;
+            p.reference_audio_urls = [voice.url];
+            p.voice = voice.meta;
+            // The clip must be at least as long as the speech.
+            if (p.duration && voice.secs) p.duration = Math.min(15, Math.max(Number(p.duration), Math.ceil(voice.secs + 0.5)));
+            return p;
+        };
+
+        const runJob = async (queueRequest) => {
             const onRequestId = (rid) => {
                 queuedId = rid;
                 queueRequest(rid);
             };
+            const voice = submittedV2V ? null : await prepareVoice();
 
             if (submittedV2V) {
                 return kie.processV2V({ model: submittedModel, video_url: submittedVideoUrl, onRequestId });
@@ -1377,7 +1429,7 @@ export function VideoStudio() {
                 if (resolutions.length > 0) i2vParams.resolution = submittedResolution;
                 i2vParams.advanced = submittedAdvanced;
                 if (cost.credits) i2vParams.estimatedCredits = cost.credits;
-                return kie.generateI2V(i2vParams);
+                return kie.generateI2V(withVoice(i2vParams, voice));
             }
 
             const params = { model: submittedModel, onRequestId };
@@ -1400,7 +1452,7 @@ export function VideoStudio() {
             params.advanced = submittedAdvanced;
             if (cost.credits) params.estimatedCredits = cost.credits;
 
-            return kie.generateVideo(params);
+            return kie.generateVideo(withVoice(params, voice));
         };
 
         const onDone = (res) => {

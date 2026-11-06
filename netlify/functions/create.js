@@ -128,7 +128,7 @@ exports.handler = guard('create', async function (event) {
 
   const body = JSON.parse(event.body || '{}')
   let {
-    modelId, prompt, images = [], videos = [], params = {}, style, brand = false,
+    modelId, prompt, images = [], videos = [], audios = [], params = {}, style, brand = false,
     avatarLoraUrl, avatarTriggerWord,
   } = body
   if (!prompt) return json(400, { error: 'Prompt is required.' })
@@ -266,6 +266,10 @@ exports.handler = guard('create', async function (event) {
     if (model.videos.required && videos.length !== 1) return json(400, { error: `${model.label} requires exactly one source video.` })
     if (videos.length > model.videos.max || videos.some(v => !isPublicUrl(v))) return json(400, { error: `${model.label} needs a public source-video URL.` })
   }
+  if (audios.length) {
+    if (!model.audios) return json(400, { error: `${model.label} cannot use a voiceover. Pick Seedance 2.0.` })
+    if (audios.length > model.audios.max || audios.some(a => !isPublicUrl(a))) return json(400, { error: `${model.label} needs up to ${model.audios.max} public audio URLs.` })
+  }
   if (images.length && !model.images) return json(400, { error: `${model.label} accepts no reference images.` })
   if (model.images?.required && !images.length && !brand) return json(400, { error: `${model.label} requires at least one image.` })
   if (model.images && images.length > model.images.max) return json(400, { error: `${model.label} accepts at most ${model.images.max} images.` })
@@ -290,6 +294,7 @@ exports.handler = guard('create', async function (event) {
   const input = { prompt, ...params }
   if (hosted.length && model.images) input[model.images.param] = model.images.single ? hosted[0] : hosted
   if (videos.length && model.videos) input[model.videos.param] = model.videos.single ? videos[0] : videos
+  if (audios.length && model.audios) input[model.audios.param] = audios
   if (model.resolutionParam && input.resolution) { input[model.resolutionParam] = input.resolution; delete input.resolution }
   if (model.noPrompt) delete input.prompt
   if (model.inputFixed) Object.assign(input, model.inputFixed)
@@ -297,7 +302,10 @@ exports.handler = guard('create', async function (event) {
   const cb = base ? `${base}/.netlify/functions/callback` : undefined
   const taskId = await createTask(model.taskModel || modelId, input, cb, keys.kie)
   const estimated = Math.max(0, Math.min(100000, Number(body.estimatedCredits) || 0))
-  const stored = await storeQueued({ model, prompt, taskId, input, credits: Number(model.credits || 0), accountId: auth.account.id, estimated })
+  // Voiceover details ride along in the Library row (not sent to the model).
+  const v = body.voice && typeof body.voice === 'object' ? body.voice : null
+  const voiceMeta = v ? { name: String(v.name || '').slice(0, 60), provider: v.provider === 'elevenlabs' ? 'elevenlabs' : 'kie', chars: Number(v.chars) || 0, credits: Math.max(0, Math.min(1000, Number(v.credits) || 0)) } : undefined
+  const stored = await storeQueued({ model, prompt, taskId, input: voiceMeta ? { ...input, _voice: voiceMeta } : input, credits: Number(model.credits || 0), accountId: auth.account.id, estimated })
   await trackUsage(auth.account, 'kie', Number(model.credits || 0))
   return json(200, { ok: true, taskId, kind: model.kind, model: modelId, prompt, params: input, provider: 'kie', ...stored })
 })

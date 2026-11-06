@@ -377,6 +377,7 @@ function accountProviderKeys(account) {
   return {
     kie: String(account?.fields?.['Kie API Key'] || ''),
     fal: String(account?.fields?.['fal API Key'] || ''),
+    eleven: String(account?.fields?.['ElevenLabs API Key'] || '').trim(),
   }
 }
 

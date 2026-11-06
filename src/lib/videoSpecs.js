@@ -123,7 +123,8 @@ export function buildVideoParams(params) {
     }
     const isSeedance2 = params.model === 'bytedance/seedance-2' || params.model === 'bytedance/seedance-2-fast';
     if (hasImage && isSeedance2) {
-        const role = extra.image_role || 'first frame';
+        // A voiceover (reference audio) cannot be combined with first-frame mode.
+        const role = params.reference_audio_urls?.length ? 'reference' : (extra.image_role || 'first frame');
         if (role === 'first frame') { firstFrame = params.image_url; images = []; }
     }
     return { params: out, images, firstFrame };

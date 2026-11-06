@@ -9,6 +9,7 @@ import { advancedFieldsFor } from '../lib/videoSpecs.js';
 import { CAMERA_PRESETS } from '../lib/presets.js';
 import { VIDEO_STYLES, fitModels, pickBest, fitInfo, lockInstruction, joinPrompt, voiceCredits, voiceSeconds } from '../lib/modelStyles.js';
 import { makeVoiceover } from '../lib/api.js';
+import { takeHandoff } from '../lib/handoff.js';
 import { createSetupPanel } from './SetupPanel.js';
 import { esc } from '../lib/resultCards.js';
 
@@ -1491,6 +1492,39 @@ export function VideoStudio() {
             flashBanner(`Could not start video: ${e.message.slice(0, 80)}`);
         });
     };
+
+    // Opened from the Library: animate an image, or redo a past clip's settings.
+    const handoff = takeHandoff('video');
+    if (handoff) setTimeout(() => {
+        if (handoff.mode === 'animate' && handoff.imageUrl) {
+            picker.setImage(handoff.imageUrl, handoff.thumb);
+            textarea.placeholder = 'Describe the motion or what happens in the video';
+        } else if (handoff.mode === 'redo') {
+            textarea.value = handoff.prompt || '';
+            textarea.oninput?.();
+            const m = getCurrentModels().find(x => x.id === handoff.model) || lockPool().find(x => x.id === handoff.model);
+            if (m && getCurrentModels().includes(m)) {
+                selectedModel = m.id; selectedModelName = m.name;
+                document.getElementById('v-model-btn-label').textContent = selectedModelName;
+                updateControlsForModel(selectedModel);
+                if (handoff.aspect && getCurrentAspectRatios(m.id).includes(handoff.aspect)) {
+                    selectedAr = handoff.aspect;
+                    document.getElementById('v-ar-btn-label').textContent = selectedAr;
+                }
+                const d = Number(handoff.duration);
+                if (d && getCurrentDurations(m.id).includes(d)) {
+                    selectedDuration = d;
+                    document.getElementById('v-duration-btn-label').textContent = `${d}s`;
+                }
+                if (handoff.resolution && getCurrentResolutions(m.id).includes(handoff.resolution)) {
+                    selectedResolution = handoff.resolution;
+                    document.getElementById('v-resolution-btn-label').textContent = selectedResolution;
+                }
+                refreshCost();
+            }
+        }
+        textarea.focus();
+    }, 50);
 
     return container;
 }

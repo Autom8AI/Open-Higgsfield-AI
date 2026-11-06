@@ -2,6 +2,7 @@
 // All media types in one place (images, videos, talking avatars), sorted with
 // the newest first. Requires a backend session; prompts sign-in otherwise.
 import { cfBackendEnabled, listLibrary, deleteLibraryItem } from '../lib/api.js';
+import { sendTo } from '../lib/handoff.js';
 import { BackendModal } from './BackendModal.js';
 import { getInFlightJobs } from '../lib/pendingJobs.js';
 
@@ -137,6 +138,19 @@ async function saveToDevice(item, btn) {
 }
 
 // Full-screen preview HUD: big preview, prompt/model details, and
+// "Make video", "Edit" and "Redo" open the right studio with this item loaded.
+function itemActions(item) {
+    const isVideo = groupOf(item) === 'videos';
+    const imageUrl = item.sourceUrl || item.url || '';
+    const redo = { label: 'Redo', title: 'Open with the same prompt and settings', run: () => sendTo(isVideo ? 'video' : 'image', { mode: 'redo', prompt: item.prompt, model: item.model, aspect: item.aspect, duration: item.duration, resolution: item.resolution }) };
+    if (isVideo) return [redo];
+    return [
+        { label: 'Make video', title: 'Animate this image in the Video tab', run: () => sendTo('video', { mode: 'animate', imageUrl, thumb: item.thumb }) },
+        { label: 'Edit', title: 'Change this image in the Image tab', run: () => sendTo('image', { mode: 'edit', imageUrl, thumb: item.thumb }) },
+        redo,
+    ];
+}
+
 // Save to device / Open original actions.
 function openPreview(item) {
     const isVideo = groupOf(item) === 'videos';
@@ -164,6 +178,7 @@ function openPreview(item) {
             <div class="flex items-center gap-3 flex-wrap justify-center">
                 <button data-save class="px-6 py-3 rounded-xl bg-primary text-black text-[11px] font-black uppercase tracking-widest shadow-glow hover:scale-105 active:scale-95 transition-all">Save to device</button>
                 <a href="${safeUrl(item.sourceUrl || fullUrl)}" target="_blank" rel="noopener" class="px-6 py-3 rounded-xl bg-white/10 text-white text-[11px] font-black uppercase tracking-widest hover:bg-white/20 transition-all">Open original</a>
+                <span data-actions class="contents"></span>
             </div>
         </div>
     `;
@@ -178,6 +193,15 @@ function openPreview(item) {
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
     overlay.querySelector('[data-close]').onclick = close;
     overlay.querySelector('[data-save]').onclick = (e) => saveToDevice(item, e.currentTarget);
+    const actionSlot = overlay.querySelector('[data-actions]');
+    itemActions(item).forEach(a => {
+        const b = document.createElement('button');
+        b.className = 'px-6 py-3 rounded-xl bg-white/10 text-white text-[11px] font-black uppercase tracking-widest hover:bg-primary hover:text-black transition-all';
+        b.textContent = a.label;
+        b.title = a.title;
+        b.onclick = () => { close(); a.run(); };
+        actionSlot.appendChild(b);
+    });
 }
 
 function card(item, onDelete) {
@@ -224,6 +248,21 @@ function card(item, onDelete) {
         }
     };
     if (!item.local) card.appendChild(deleteBtn);
+
+    // Make video / Edit / Redo, beside the delete button.
+    if (ready && !item.local) {
+        const bar = document.createElement('div');
+        bar.className = 'absolute top-12 right-3 z-10 flex flex-col items-end gap-1.5 md:opacity-0 md:group-hover:opacity-100 transition-opacity';
+        itemActions(item).forEach(a => {
+            const b = document.createElement('button');
+            b.className = 'h-7 px-2.5 rounded-full bg-black/80 backdrop-blur border border-white/15 text-[10px] font-black text-white hover:bg-primary hover:text-black transition-colors whitespace-nowrap';
+            b.textContent = a.label;
+            b.title = a.title;
+            b.onclick = (e) => { e.stopPropagation(); a.run(); };
+            bar.appendChild(b);
+        });
+        card.appendChild(bar);
+    }
 
     if (ready) {
         card.onclick = () => openPreview(item);

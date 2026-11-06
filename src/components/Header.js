@@ -71,6 +71,13 @@ export function Header(navigate) {
         menu.appendChild(link);
     });
 
+    // Keep the highlight right when a page opens another (e.g. Library -> Video).
+    window.addEventListener('navigate', (e) => {
+        const page = String(e.detail?.page || '');
+        const name = page.startsWith('video') ? 'Video' : page.startsWith('image') ? 'Image' : page === 'library' ? 'Library' : page === 'characters' ? 'Characters' : null;
+        if (name && links[name]) activate(name);
+    });
+
     leftPart.appendChild(logoContainer);
     
     // Settings button for API key management

@@ -18,6 +18,8 @@ const PAGES = {
   lipsync: videoHub('lipsync'),
   factory: videoHub('factory'),
   cinema: imageHub('cinema'),
+  'video-create': videoHub('create'),
+  'image-create': imageHub('create'),
   characters: () => import('./components/CharactersPage.js').then(m => m.CharactersPage),
   library: () => import('./components/LibraryPage.js').then(m => m.LibraryPage),
 };

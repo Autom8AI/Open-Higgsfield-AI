@@ -716,3 +716,6 @@ i2vModels.push(...t2vModels.filter(m => (m.images || getVideoSpec(m.id)?.imageOn
 for (let i = t2vModels.length - 1; i >= 0; i--) {
   if (t2vModels[i].images?.required || getVideoSpec(t2vModels[i].id)?.imageOnly) t2vModels.splice(i, 1);
 }
+// Text-to-image also lists the image models whose reference photos are optional
+// (Nano Banana Pro / 2 / 2 Lite); edit-only endpoints stay in the edit list.
+t2iModels.push(...i2iModels.filter(m => !m.images?.required && !/image-to-image|edit/.test(m.id) && !t2iModels.some(x => x.id === m.id)));

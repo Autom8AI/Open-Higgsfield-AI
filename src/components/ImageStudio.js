@@ -9,6 +9,7 @@ import { sortByPriceDesc, loadPricing, priceChipHtml, costText } from '../lib/mo
 import { createQueueHistory, pendingThumbHtml, creditBadgeHtml, costMeta } from '../lib/studioQueue.js';
 import { IMAGE_STYLES, fitModels, pickBest, fitInfo, lockInstruction, joinPrompt } from '../lib/modelStyles.js';
 import { createSetupPanel } from './SetupPanel.js';
+import { takeHandoff } from '../lib/handoff.js';
 import { esc } from '../lib/resultCards.js';
 import { AuthModal } from './AuthModal.js';
 import { createUploadPicker } from './UploadPicker.js';
@@ -1236,6 +1237,25 @@ export function ImageStudio() {
             flashBanner(`Could not start image: ${e.message.slice(0, 80)}`);
         });
     };
+
+    // Opened from the Library: edit an image, or redo a past image's prompt and settings.
+    const handoff = takeHandoff('image');
+    if (handoff) setTimeout(() => {
+        if (handoff.mode === 'edit' && handoff.imageUrl) {
+            picker.setImages([{ url: handoff.imageUrl, thumb: handoff.thumb }]);
+            textarea.placeholder = 'Describe the change, e.g. "make the background a beach at sunset"';
+        } else if (handoff.mode === 'redo') {
+            textarea.value = handoff.prompt || '';
+            const m = getCurrentModels().find(x => x.id === handoff.model);
+            if (m) applyModel(m);
+            if (handoff.aspect && getCurrentAspectRatios(selectedModel).includes(handoff.aspect)) {
+                selectedAr = handoff.aspect;
+                document.getElementById('ar-btn-label').textContent = selectedAr;
+            }
+            refreshCost();
+        }
+        textarea.focus();
+    }, 50);
 
     return container;
 }

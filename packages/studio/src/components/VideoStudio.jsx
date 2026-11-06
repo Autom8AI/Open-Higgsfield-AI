@@ -34,7 +34,8 @@ async function downloadFile(url, filename) {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(blobUrl);
-    } catch {
+    } catch (err) {
+        console.warn('[VideoStudio] Direct download failed, falling back to window.open', err);
         window.open(url, '_blank');
     }
 }
@@ -428,7 +429,6 @@ export default function VideoStudio({ apiKey, onGenerationComplete, historyItems
             setV2vMode(true);
             setImageMode(false);
             setUploadedImageUrl(null);
-            setUploadedImagePreview(null);
             setSelectedModel(m.id);
             setSelectedModelName(m.name);
             applyControlsForModel(m.id, false, true);
@@ -584,7 +584,6 @@ export default function VideoStudio({ apiKey, onGenerationComplete, historyItems
         resetToPromptBar();
         setPrompt('');
         setUploadedImageUrl(null);
-        setUploadedImagePreview(null);
         setImageMode(false);
         setUploadedVideoUrl(null);
         setUploadedVideoName(null);
@@ -602,7 +601,6 @@ export default function VideoStudio({ apiKey, onGenerationComplete, historyItems
         resetToPromptBar();
         setPrompt('');
         setUploadedImageUrl(null);
-        setUploadedImagePreview(null);
         setImageMode(false);
         setSelectedModel('seedance-v2.0-extend');
         setSelectedModelName('Seedance 2.0 Extend');

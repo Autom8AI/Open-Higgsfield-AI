@@ -29,7 +29,8 @@ async function downloadImage(url, filename) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(blobUrl);
-  } catch {
+  } catch (err) {
+    console.warn("[ImageStudio] Direct download failed, falling back to window.open", err);
     window.open(url, "_blank");
   }
 }

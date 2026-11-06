@@ -84,7 +84,8 @@ function normalizeModel(model) {
 // 1 credit ≈ US$0.005). These are each model's cheapest option, so they are
 // flagged `from: true`; measured averages from real runs replace them.
 const KIE_FROM_PRICES = {
-  'bytedance/seedance-2': [11.5, 'cr/sec'],
+  // Seedance 2.0 per resolution from real runs (720p: 205 cr for 5s, 1080p: 408 cr for 4s).
+  'bytedance/seedance-2': [11.5, 'cr/sec', { '720p': 41, '1080p': 102 }],
   // Text/image-to-video rates; the lower 6.8 cr/s on kie.ai/pricing is for video input.
   'bytedance/seedance-2-fast': [11.7, 'cr/sec', { '480p': 11.7, '720p': 24.8 }],
   'kling-3.0/video': [15.1, 'cr/sec'],
@@ -154,6 +155,9 @@ exports.handler = guard('models', async function (event) {
     const unit = isVideo && duration ? 'cr/sec' : (isVideo ? 'cr/video' : 'cr/image')
     const res = String(params.resolution || params.output_resolution || '')
     const s = (seen[f.Model] ||= { unit, samples: [], byRes: {} })
+    // A run stored without a duration is a per-video total; never average it
+    // into per-second samples (that made Seedance 2.0 720p read 205 cr/s).
+    if (s.unit !== unit) continue
     s.samples.push(value)
     if (res) (s.byRes[res] ||= []).push(value)
   }

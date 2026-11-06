@@ -78,13 +78,16 @@ export function priceInfo(model, resolution) {
         if (!res || !table) return null;
         return table[res] || table[res.toLowerCase()] || table[res.toUpperCase()] || null;
     };
+    // The all-resolution average only helps when prices do not vary by resolution.
+    const perRes = res && (Object.keys(p.measuredByResolution || {}).length || p.byResolution);
     const measured = pick(at(p.measuredByResolution), p.measuredUnit)
         || pick(at(p.byResolution), p.unit)
-        || pick({ credits: p.measuredCredits, unit: p.measuredUnit }, p.measuredUnit);
+        || (perRes ? null : pick({ credits: p.measuredCredits, unit: p.measuredUnit }, p.measuredUnit));
     if (measured) return measured;
     // Published kie.ai "from" price: the model's cheapest option.
     const published = pick(p, p.unit);
-    return published ? { ...published, from: Boolean(p.from) } : null;
+    // No price for this resolution: the base price is only a lower bound.
+    return published ? { ...published, from: Boolean(p.from) || Boolean(p.byResolution) } : null;
 }
 
 const round = (n) => Math.round(n * 10) / 10;

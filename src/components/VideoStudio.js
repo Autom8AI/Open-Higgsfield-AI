@@ -7,8 +7,9 @@ import { sortByPriceDesc, loadPricing, priceChipHtml, costText } from '../lib/mo
 import { createQueueHistory, pendingThumbHtml, creditBadgeHtml, costMeta } from '../lib/studioQueue.js';
 import { advancedFieldsFor } from '../lib/videoSpecs.js';
 import { CAMERA_PRESETS } from '../lib/presets.js';
-import { createCharacterButton } from '../lib/characters.js';
-import { VIDEO_STYLES, fitsStyle, filterByStyle, pickForStyle, joinPrompt } from '../lib/modelStyles.js';
+import { VIDEO_STYLES, fitModels, pickBest, fitInfo, lockInstruction, joinPrompt } from '../lib/modelStyles.js';
+import { createSetupPanel } from './SetupPanel.js';
+import { esc } from '../lib/resultCards.js';
 
 export function VideoStudio() {
     const container = document.createElement('div');
@@ -33,12 +34,24 @@ export function VideoStudio() {
     let uploadedVideoUrl = null;
     let advancedOpen = false;
     let selectedCamera = CAMERA_PRESETS[0];
-    let selectedStyle = 'all'; // filters the model list and adds a style hint to the prompt
+    let setup = null; // shot setup panel (look + character/item locks), created with the prompt bar
     let advancedValues = {}; // per-model values for the Advanced panel, reset on model change
 
-    const getCurrentModels = () => v2vMode ? v2vModels : (imageMode ? i2vModels : t2vModels);
+    // With a character/item lock on, every model that takes reference photos is a candidate.
+    const lockOn = () => !!setup?.getState().locks;
+    const lockPool = () => { const seen = new Set(); return [...t2vModels, ...i2vModels].filter(m => !seen.has(m.id) && seen.add(m.id)); };
+    const getCurrentModels = () => v2vMode ? v2vModels : (lockOn() ? lockPool() : (imageMode ? i2vModels : t2vModels));
+    // Best model in a list for the current look (no lock), used when switching lists.
+    const bestOf = (list, currentId = '') => {
+        const st = setup?.getState() || { style: 'any', locks: false, refCount: 0 };
+        return pickBest(fitModels(st.locks ? lockPool() : list, st), currentId) || list[0];
+    };
     const getCurrentAspectRatios = (id) => imageMode ? getAspectRatiosForI2VModel(id) : getAspectRatiosForVideoModel(id);
-    const getCurrentDurations = (id) => imageMode ? getDurationsForI2VModel(id) : getDurationsForModel(id);
+    const getCurrentDurations = (id) => {
+        const ref = lockOn() && fitInfo(id)?.refDuration;
+        if (ref) return [ref]; // e.g. Veo reference mode is 8s only
+        return imageMode ? getDurationsForI2VModel(id) : getDurationsForModel(id);
+    };
     const getCurrentResolutions = (id) => imageMode ? getResolutionsForI2VModel(id) : getResolutionsForVideoModel(id);
     const getCurrentModes = (id) => getModesForModel(id);
     const getCurrentModel = () => getCurrentModels().find(m => m.id === selectedModel);
@@ -84,6 +97,9 @@ export function VideoStudio() {
     const bar = document.createElement('div');
     bar.className = 'w-full bg-[#111]/90 backdrop-blur-xl border border-white/10 rounded-[1.5rem] md:rounded-[2.5rem] p-3 md:p-5 flex flex-col gap-3 md:gap-5 shadow-3xl';
 
+    setup = createSetupPanel({ styles: VIDEO_STYLES, onChange: () => onSetupChange() });
+    bar.appendChild(setup.element);
+
     const topRow = document.createElement('div');
     topRow.className = 'flex items-start gap-5 px-2';
 
@@ -101,7 +117,7 @@ export function VideoStudio() {
             if (!imageMode) {
                 imageMode = true;
                 const keep = i2vModels.find(m => m.id === selectedModel);
-                const next = keep || pickForStyle(i2vModels, selectedModel, selectedStyle);
+                const next = keep || bestOf(i2vModels, selectedModel);
                 if (next) {
                     selectedModel = next.id;
                     selectedModelName = next.name;
@@ -118,7 +134,7 @@ export function VideoStudio() {
             uploadedImageUrl = null;
             imageMode = false;
             const keep = t2vModels.find(m => m.id === selectedModel);
-            const next = keep || pickForStyle(t2vModels, selectedModel, selectedStyle);
+            const next = keep || bestOf(t2vModels, selectedModel);
             selectedModel = next.id;
             selectedModelName = next.name;
             document.getElementById('v-model-btn-label').textContent = selectedModelName;
@@ -186,7 +202,7 @@ export function VideoStudio() {
         uploadedVideoUrl = null;
         v2vMode = false;
         showVideoIcon();
-        { const first = pickForStyle(t2vModels, '', selectedStyle); selectedModel = first.id; selectedModelName = first.name; }
+        { const first = bestOf(t2vModels); selectedModel = first.id; selectedModelName = first.name; }
         document.getElementById('v-model-btn-label').textContent = selectedModelName;
         updateControlsForModel(selectedModel);
         textarea.placeholder = 'Describe the video you want to create';
@@ -261,6 +277,11 @@ export function VideoStudio() {
     topRow.appendChild(textarea);
     bar.appendChild(topRow);
 
+    // Shows what the look, camera and locks add to the prompt, so nothing is hidden.
+    const alsoSent = document.createElement('div');
+    alsoSent.className = 'hidden px-2 -mt-2 text-[10px] leading-relaxed text-muted';
+    bar.appendChild(alsoSent);
+
     // Extend mode banner (shown when extend model is active, not editable by user)
     const extendBanner = document.createElement('div');
     extendBanner.className = 'hidden items-center gap-2 px-4 py-2 mx-2 mt-2 bg-primary/10 border border-primary/20 rounded-xl text-xs text-primary';
@@ -316,14 +337,9 @@ export function VideoStudio() {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="opacity-60 text-secondary"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
     `, selectedMode || 'normal', 'v-mode-btn');
 
-    const styleBtn = createControlBtn(`
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="opacity-60 text-secondary"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.7-.8 1.7-1.7 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.8-1.7 1.7-1.7h2c3.1 0 5.6-2.5 5.6-5.6C22 6 17.5 2 12 2z"/></svg>
-    `, 'Style: All', 'v-style-btn', 'Pick a style to see the models that fit it');
-
-    controlsLeft.appendChild(styleBtn);
     controlsLeft.appendChild(modelBtn);
-    controlsLeft.appendChild(arBtn);
     controlsLeft.appendChild(durationBtn);
+    controlsLeft.appendChild(arBtn);
     controlsLeft.appendChild(resolutionBtn);
     controlsLeft.appendChild(qualityBtn);
     
@@ -331,19 +347,6 @@ export function VideoStudio() {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="opacity-60 text-secondary"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
     `, 'Camera: Auto', 'v-camera-btn', 'Choose a camera move');
     controlsLeft.appendChild(cameraBtn);
-
-    // Saved character: use its first photo as the image, as a look reference where supported.
-    const characterBtn = createCharacterButton({
-        onPick: (c) => {
-            const p = c.portraits[0];
-            picker.setImage(p.url, p.thumb);
-            if (advancedFieldsFor(selectedModel, true).some(f => f.key === 'image_role')) {
-                advancedValues.image_role = 'reference';
-                renderAdvanced();
-            }
-        },
-    });
-    controlsLeft.appendChild(characterBtn.element);
 
     // Advanced options toggle button
     const advancedBtn = createControlBtn(`
@@ -621,6 +624,47 @@ export function VideoStudio() {
         return bits.join(' · ');
     };
 
+    // Short description of the setup, e.g. "Realistic · Character + Item lock".
+    const setupSummary = () => {
+        const st = setup.getState();
+        const locks = [st.characterOn ? 'Character' : '', st.itemOn ? 'Item' : ''].filter(Boolean);
+        return [st.style === 'any' ? 'any look' : st.styleLabel, locks.length ? `${locks.join(' + ')} lock` : ''].filter(Boolean).join(' · ');
+    };
+
+    // What gets added to the typed prompt (History keeps only the typed text).
+    const extraPrompt = () => {
+        const st = setup.getState();
+        return joinPrompt(selectedCamera.text, st.styleHint, st.locks ? lockInstruction(st.characters, st.items) : '');
+    };
+    const refreshAlsoSent = () => {
+        const extra = extraPrompt();
+        alsoSent.classList.toggle('hidden', !extra);
+        alsoSent.textContent = extra ? `Added to your prompt: ${extra}` : '';
+    };
+
+    // Keep the model, photo limit and hints in line with the setup panel.
+    const syncSetup = () => {
+        const st = setup.getState();
+        const fit = fitInfo(selectedModel);
+        setup.setLimit(st.locks && fit?.refs ? { max: fit.refs, model: selectedModelName } : null);
+        refreshAlsoSent();
+    };
+    const onSetupChange = () => {
+        const st = setup.getState();
+        picker.trigger.style.display = st.locks ? 'none' : '';
+        if (st.locks && imageMode) { picker.reset(); uploadedImageUrl = null; imageMode = false; }
+        if (!v2vMode) {
+            const best = pickBest(fitModels(getCurrentModels(), { style: st.style, locks: st.locks, refCount: st.refCount }), selectedModel);
+            if (best && best.id !== selectedModel) {
+                selectedModel = best.id;
+                selectedModelName = best.name;
+                document.getElementById('v-model-btn-label').textContent = selectedModelName;
+            }
+            updateControlsForModel(selectedModel, true);
+        }
+        syncSetup();
+    };
+
     const showDropdown = (type, anchorBtn) => {
         dropdown.innerHTML = '';
         dropdown.classList.remove('opacity-0', 'pointer-events-none');
@@ -637,13 +681,13 @@ export function VideoStudio() {
                             <input type="text" id="v-model-search" placeholder="Search models..." class="bg-transparent border-none text-xs text-white focus:ring-0 w-full p-0">
                         </div>
                     </div>
-                    <div class="text-[10px] font-bold text-secondary uppercase tracking-widest px-3 py-2 shrink-0">Video models${selectedStyle !== 'all' ? ` · ${VIDEO_STYLES.find(s => s.id === selectedStyle).label}` : ''}</div>
+                    <div class="text-[10px] font-bold text-secondary uppercase tracking-widest px-3 py-2 shrink-0">Best models for ${esc(setupSummary())}</div>
                     <div id="v-model-list-container" class="flex flex-col gap-1.5 overflow-y-auto custom-scrollbar pr-1 pb-2"></div>
                 </div>
             `;
             const list = dropdown.querySelector('#v-model-list-container');
 
-            const makeModelItem = (m, isV2V = false) => {
+            const makeModelItem = (m, isV2V = false, fitResult = null) => {
                 const item = document.createElement('div');
                 item.className = `flex items-center justify-between p-3.5 hover:bg-white/5 rounded-2xl cursor-pointer transition-all border border-transparent hover:border-white/5 ${selectedModel === m.id ? 'bg-white/5 border-white/5' : ''}`;
                 const iconColor = isV2V ? 'bg-orange-500/10 text-orange-400' : m.id.includes('kling') ? 'bg-blue-500/10 text-blue-400' : m.id.includes('veo') ? 'bg-purple-500/10 text-purple-400' : m.id.includes('sora') ? 'bg-rose-500/10 text-rose-400' : 'bg-primary/10 text-primary';
@@ -653,6 +697,8 @@ export function VideoStudio() {
                          <div class="flex flex-col gap-0.5">
                             <span class="text-xs font-bold text-white tracking-tight">${m.name}</span>
                             ${isV2V ? '<span class="text-[9px] text-orange-400/70">Upload a video to use</span>' : `<span class="text-[10px] text-muted">${modelSummary(m)}</span>`}
+                            ${fitResult?.fit?.note ? `<span class="text-[10px] text-secondary">${esc(fitResult.fit.note)}</span>` : ''}
+                            ${fitResult?.overLimit ? `<span class="text-[10px] text-[#ff6b6b]">Takes up to ${fitResult.fit.refs} photos</span>` : ''}
                          </div>
                     </div>
                     <div class="flex items-center gap-2">
@@ -687,6 +733,7 @@ export function VideoStudio() {
                         document.getElementById('v-model-btn-label').textContent = selectedModelName;
                         updateControlsForModel(selectedModel);
                         textarea.placeholder = imageMode ? 'Describe the motion or effect (optional)' : 'Describe the video you want to create';
+                        syncSetup();
                     }
                     closeDropdown();
                 };
@@ -697,11 +744,21 @@ export function VideoStudio() {
                 list.innerHTML = '';
                 const lf = filter.toLowerCase();
 
-                // Regular generation models (always t2v or i2v, never v2v)
-                const generationModels = imageMode ? i2vModels : t2vModels;
-                const filteredMain = sortByPriceDesc(filterByStyle(generationModels, selectedStyle))
-                    .filter(m => m.name.toLowerCase().includes(lf) || m.id.toLowerCase().includes(lf));
-                filteredMain.forEach(m => list.appendChild(makeModelItem(m, false)));
+                // Only the models that suit the look and locks, best first.
+                const st = setup.getState();
+                const results = fitModels(v2vMode ? (imageMode ? i2vModels : t2vModels) : getCurrentModels(), { style: st.style, locks: st.locks, refCount: st.refCount })
+                    .filter(r => r.model.name.toLowerCase().includes(lf) || r.model.id.toLowerCase().includes(lf));
+                results.forEach(r => {
+                    const item = makeModelItem(r.model, false, r);
+                    if (r.overLimit) item.classList.add('opacity-50');
+                    list.appendChild(item);
+                });
+                if (!results.length) {
+                    const empty = document.createElement('div');
+                    empty.className = 'text-xs text-secondary p-3';
+                    empty.textContent = 'No model fits this look and lock. Try another look.';
+                    list.appendChild(empty);
+                }
 
                 // Video Tools section
                 const filteredV2V = sortByPriceDesc(v2vModels).filter(m => m.name.toLowerCase().includes(lf) || m.id.toLowerCase().includes(lf));
@@ -815,39 +872,6 @@ export function VideoStudio() {
             });
             dropdown.appendChild(list);
 
-        } else if (type === 'style') {
-            dropdown.classList.add('max-w-[240px]');
-            dropdown.innerHTML = `<div class="text-[10px] font-bold text-secondary uppercase tracking-widest px-3 py-2 border-b border-white/5 mb-2">Video style</div>`;
-            const list = document.createElement('div');
-            list.className = 'flex flex-col gap-1';
-            const pool = imageMode ? i2vModels : t2vModels;
-            VIDEO_STYLES.forEach(st => {
-                const count = filterByStyle(pool, st.id).length;
-                const item = document.createElement('div');
-                item.className = 'flex items-center justify-between p-3 hover:bg-white/5 rounded-2xl cursor-pointer transition-all group';
-                item.title = st.hint || 'Show every model';
-                item.innerHTML = `<span class="text-xs font-bold text-white opacity-80 group-hover:opacity-100"></span><span class="flex items-center gap-2"><span class="text-[10px] text-muted">${count} model${count === 1 ? '' : 's'}</span>${selectedStyle === st.id ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff2d2d" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}</span>`;
-                item.firstElementChild.textContent = st.label;
-                item.onclick = (e) => {
-                    e.stopPropagation();
-                    selectedStyle = st.id;
-                    document.getElementById('v-style-btn-label').textContent = `Style: ${st.id === 'all' ? 'All' : st.label}`;
-                    if (!v2vMode) {
-                        const current = pool.find(m => m.id === selectedModel);
-                        if (!current || !fitsStyle(current, st.id)) {
-                            const next = pickForStyle(pool, selectedModel, st.id);
-                            selectedModel = next.id;
-                            selectedModelName = next.name;
-                            document.getElementById('v-model-btn-label').textContent = selectedModelName;
-                            updateControlsForModel(selectedModel);
-                        }
-                    }
-                    closeDropdown();
-                };
-                list.appendChild(item);
-            });
-            dropdown.appendChild(list);
-
         } else if (type === 'camera') {
             dropdown.classList.add('max-w-[240px]');
             dropdown.innerHTML = `<div class="text-[10px] font-bold text-secondary uppercase tracking-widest px-3 py-2 border-b border-white/5 mb-2">Camera move</div>`;
@@ -863,6 +887,7 @@ export function VideoStudio() {
                     e.stopPropagation();
                     selectedCamera = c;
                     document.getElementById('v-camera-btn-label').textContent = `Camera: ${c.label}`;
+                    refreshAlsoSent();
                     closeDropdown();
                 };
                 list.appendChild(item);
@@ -925,7 +950,6 @@ export function VideoStudio() {
     qualityBtn.onclick = toggleDropdown('quality', qualityBtn);
     modeBtn.onclick = toggleDropdown('mode', modeBtn);
     cameraBtn.onclick = toggleDropdown('camera', cameraBtn);
-    styleBtn.onclick = toggleDropdown('style', styleBtn);
 
     window.addEventListener('click', closeDropdown);
     container.appendChild(dropdown);
@@ -1204,7 +1228,7 @@ export function VideoStudio() {
         uploadedVideoUrl = null;
         v2vMode = false;
         showVideoIcon();
-        { const first = pickForStyle(t2vModels, '', selectedStyle); selectedModel = first.id; selectedModelName = first.name; }
+        { const first = bestOf(t2vModels); selectedModel = first.id; selectedModelName = first.name; }
         document.getElementById('v-model-btn-label').textContent = selectedModelName;
         updateControlsForModel(selectedModel);
         textarea.placeholder = 'Describe the video you want to create';
@@ -1232,7 +1256,6 @@ export function VideoStudio() {
     // back to the first text-to-video model because there is no image any more.
     const resetInputs = () => {
         picker.reset();
-        characterBtn.reset();
         uploadedImageUrl = null;
         if (v2vMode) {
             uploadedVideoUrl = null;
@@ -1243,7 +1266,7 @@ export function VideoStudio() {
         if (imageMode) {
             imageMode = false;
             const keep = t2vModels.find(m => m.id === selectedModel);
-            const next = keep || pickForStyle(t2vModels, selectedModel, selectedStyle);
+            const next = keep || bestOf(t2vModels, selectedModel);
             selectedModel = next.id;
             selectedModelName = next.name;
             document.getElementById('v-model-btn-label').textContent = selectedModelName;
@@ -1287,6 +1310,15 @@ export function VideoStudio() {
             }
         }
 
+        const lockState = setup.getState();
+        if (!v2vMode && lockState.locks) {
+            if (lockState.uploading) { alert('Photos are still uploading — one moment.'); return; }
+            if (!lockState.refCount) { alert('Add at least one photo to the character/item lock, or turn the lock off.'); return; }
+            const fit = fitInfo(selectedModel);
+            if (!fit?.refs) { alert(`${selectedModelName} cannot use reference photos. Pick another model.`); return; }
+            if (lockState.refCount > fit.refs) { alert(`${selectedModelName} keeps up to ${fit.refs} photos. Remove some or pick another model.`); return; }
+        }
+
         const apiKey = localStorage.getItem('kie_key');
         const cfLogged = !!localStorage.getItem('cf_backend');
         if (!apiKey && !cfLogged) {
@@ -1302,8 +1334,9 @@ export function VideoStudio() {
         const submittedResolution = selectedResolution;
         const submittedAdvanced = { ...advancedValues };
         // The chosen camera move is added to what the model receives (History keeps the typed prompt).
-        const styleHint = VIDEO_STYLES.find(s => s.id === selectedStyle)?.hint || '';
-        const promptForModel = joinPrompt(prompt, selectedCamera.text, styleHint);
+        const setupState = setup.getState();
+        const promptForModel = joinPrompt(prompt, extraPrompt());
+        const submittedRefs = setupState.locks ? setupState.refs.slice() : [];
         const submittedImageMode = imageMode;
         const submittedV2V = v2vMode;
         const submittedImageUrl = uploadedImageUrl;
@@ -1348,6 +1381,7 @@ export function VideoStudio() {
             }
 
             const params = { model: submittedModel, onRequestId };
+            if (submittedRefs.length) params.reference_urls = submittedRefs;
 
             if (promptForModel) params.prompt = promptForModel;
 

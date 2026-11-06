@@ -144,9 +144,9 @@ function mapVideoId(id) {
 
 export async function generateImage(params) {
     return create({
-        modelId: mapImageId(params.model, !!params.image_url),
+        modelId: mapImageId(params.model, !!(params.images_list?.length || params.image_url)),
         prompt: params.prompt,
-        images: params.image_url ? [params.image_url] : [],
+        images: params.images_list?.length ? params.images_list : (params.image_url ? [params.image_url] : []),
         params: { ...(params.aspect_ratio ? { aspect_ratio: params.aspect_ratio } : {}), ...(params.resolution ? { resolution: String(params.resolution).toUpperCase() } : {}) }
     }, params);
 }

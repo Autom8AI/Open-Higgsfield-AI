@@ -450,7 +450,7 @@ export const t2vModels = [
     "blurb": "Google Veo 3.1 with native audio. Great for UGC and ads.",
     "images": {
       "param": "image_urls",
-      "max": 2,
+      "max": 3,
       "required": false
     },
     "aspects": [
@@ -478,7 +478,7 @@ export const t2vModels = [
     "blurb": "Cheapest Veo 3.1 tier, with audio.",
     "images": {
       "param": "image_urls",
-      "max": 2,
+      "max": 3,
       "required": false
     },
     "aspects": [

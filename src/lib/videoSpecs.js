@@ -113,6 +113,14 @@ export function buildVideoParams(params) {
 
     let images = hasImage ? [params.image_url] : [];
     let firstFrame = null;
+    // Locked character/item photos: always sent as references, never as a start frame.
+    if (params.reference_urls?.length) {
+        if (String(params.model).startsWith('veo-3-1/')) {
+            out.generation_type = 'REFERENCE_2_VIDEO';
+            out.duration = 8; // Veo reference mode only makes 8s clips
+        }
+        return { params: out, images: params.reference_urls.slice(), firstFrame: null };
+    }
     const isSeedance2 = params.model === 'bytedance/seedance-2' || params.model === 'bytedance/seedance-2-fast';
     if (hasImage && isSeedance2) {
         const role = extra.image_role || 'first frame';

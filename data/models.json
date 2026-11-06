@@ -108,7 +108,7 @@
     },
     {
       "id": "gpt-image-2-image-to-image",
-      "label": "GPT Image 2 — Edit",
+      "label": "GPT Image 2 \u2014 Edit",
       "kind": "image",
       "api": "jobs",
       "blurb": "Edits an uploaded photo. Legible text.",
@@ -394,7 +394,7 @@
     },
     {
       "id": "happyhorse-1-1/reference-to-video",
-      "label": "HappyHorse 1.1 — Reference",
+      "label": "HappyHorse 1.1 \u2014 Reference",
       "kind": "video",
       "api": "jobs",
       "blurb": "Reference-driven. Supports 4:5.",
@@ -456,7 +456,7 @@
       "blurb": "Google Veo 3.1 with native audio. Great for UGC and ads.",
       "images": {
         "param": "image_urls",
-        "max": 2,
+        "max": 3,
         "required": false
       },
       "aspects": [
@@ -484,7 +484,7 @@
       "blurb": "Cheapest Veo 3.1 tier, with audio.",
       "images": {
         "param": "image_urls",
-        "max": 2,
+        "max": 3,
         "required": false
       },
       "aspects": [
@@ -523,7 +523,7 @@
     },
     {
       "id": "kling/ai-avatar-pro",
-      "label": "Kling AI Avatar — Pro",
+      "label": "Kling AI Avatar \u2014 Pro",
       "kind": "talk",
       "api": "jobs",
       "blurb": "Highest realism and facial detail. Audio up to 5 minutes.",
@@ -563,7 +563,7 @@
     },
     {
       "id": "kling/ai-avatar-standard",
-      "label": "Kling AI Avatar — Standard",
+      "label": "Kling AI Avatar \u2014 Standard",
       "kind": "talk",
       "api": "jobs",
       "blurb": "Cheaper Kling tier. Stable lip-sync, less facial detail.",

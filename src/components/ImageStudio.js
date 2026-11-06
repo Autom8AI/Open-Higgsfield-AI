@@ -7,8 +7,9 @@ import {
 import { ENHANCE_TAGS, QUICK_PROMPTS } from '../lib/promptUtils.js';
 import { sortByPriceDesc, loadPricing, priceChipHtml, costText } from '../lib/modelSort.js';
 import { createQueueHistory, pendingThumbHtml, creditBadgeHtml, costMeta } from '../lib/studioQueue.js';
-import { createCharacterButton } from '../lib/characters.js';
-import { IMAGE_STYLES, fitsStyle, filterByStyle, pickForStyle, joinPrompt } from '../lib/modelStyles.js';
+import { IMAGE_STYLES, fitModels, pickBest, fitInfo, lockInstruction, joinPrompt } from '../lib/modelStyles.js';
+import { createSetupPanel } from './SetupPanel.js';
+import { esc } from '../lib/resultCards.js';
 import { AuthModal } from './AuthModal.js';
 import { createUploadPicker } from './UploadPicker.js';
 import { savePendingJob, removePendingJob, getPendingJobs, startGenerationJob } from '../lib/pendingJobs.js';
@@ -37,7 +38,7 @@ export function ImageStudio() {
     let dropdownOpen = null;
     let uploadedImageUrls = []; // array of uploaded image URLs (multi-image support)
     let imageMode = false; // false = t2i models, true = i2i models
-    let selectedStyle = 'all'; // filters the model list and adds a style hint to the prompt
+    let setup = null; // shot setup panel (look + character/item locks)
 
     // Advanced parameters state
     let negativePrompt = '';
@@ -57,10 +58,17 @@ export function ImageStudio() {
     // Quick tools panel state
     let showToolsPanel = false;
 
-    const getCurrentModels = () => imageMode ? i2iModels : t2iModels;
-    const getCurrentAspectRatios = (id) => imageMode ? getAspectRatiosForI2IModel(id) : getAspectRatiosForModel(id);
-    const getCurrentResolutions = (id) => imageMode ? getResolutionsForI2IModel(id) : getResolutionsForModel(id);
-    const getCurrentQualityField = (id) => imageMode ? getQualityFieldForI2IModel(id) : getQualityFieldForModel(id);
+    // Character/item locks send reference photos, so they use the image-to-image list.
+    const lockOn = () => !!setup?.getState().locks;
+    const useI2I = () => imageMode || lockOn();
+    const getCurrentModels = () => useI2I() ? i2iModels : t2iModels;
+    const getCurrentAspectRatios = (id) => useI2I() ? getAspectRatiosForI2IModel(id) : getAspectRatiosForModel(id);
+    const getCurrentResolutions = (id) => useI2I() ? getResolutionsForI2IModel(id) : getResolutionsForModel(id);
+    const getCurrentQualityField = (id) => useI2I() ? getQualityFieldForI2IModel(id) : getQualityFieldForModel(id);
+    const bestOf = (list) => {
+        const st = setup?.getState() || { style: 'any', locks: false, refCount: 0 };
+        return pickBest(fitModels(st.locks ? i2iModels : list, st), '') || list[0];
+    };
 
     // ==========================================
     // 1. HERO SECTION
@@ -101,6 +109,9 @@ export function ImageStudio() {
     bar.className = 'w-full bg-[#111]/90 backdrop-blur-xl border border-white/10 rounded-[1.5rem] md:rounded-[2.5rem] p-3 md:p-5 flex flex-col gap-3 md:gap-5 shadow-3xl';
 
     // Top Row: Input
+    setup = createSetupPanel({ styles: IMAGE_STYLES, onChange: () => onSetupChange() });
+    bar.appendChild(setup.element);
+
     const topRow = document.createElement('div');
     topRow.className = 'flex items-start gap-5 px-2';
 
@@ -111,7 +122,7 @@ export function ImageStudio() {
             uploadedImageUrls = urls || [url];
             if (!imageMode) {
                 imageMode = true;
-                { const first = pickForStyle(i2iModels, '', selectedStyle); selectedModel = first.id; selectedModelName = first.name; }
+                { const first = bestOf(i2iModels); selectedModel = first.id; selectedModelName = first.name; }
                 selectedAr = getAspectRatiosForI2IModel(selectedModel)[0];
                 document.getElementById('model-btn-label').textContent = selectedModelName;
                 document.getElementById('ar-btn-label').textContent = selectedAr;
@@ -127,7 +138,7 @@ export function ImageStudio() {
         onClear: () => {
             uploadedImageUrls = [];
             imageMode = false;
-            { const first = pickForStyle(t2iModels, '', selectedStyle); selectedModel = first.id; selectedModelName = first.name; }
+            { const first = bestOf(t2iModels); selectedModel = first.id; selectedModelName = first.name; }
             selectedAr = getAspectRatiosForModel(selectedModel)[0];
             document.getElementById('model-btn-label').textContent = selectedModelName;
             document.getElementById('ar-btn-label').textContent = selectedAr;
@@ -153,6 +164,11 @@ export function ImageStudio() {
 
     topRow.appendChild(textarea);
     bar.appendChild(topRow);
+
+    // Shows what the look and locks add to the prompt, so nothing is hidden.
+    const alsoSent = document.createElement('div');
+    alsoSent.className = 'hidden px-2 -mt-2 text-[10px] leading-relaxed text-muted';
+    bar.appendChild(alsoSent);
 
     // Bottom Row: Controls
     const bottomRow = document.createElement('div');
@@ -188,11 +204,6 @@ export function ImageStudio() {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="opacity-60 text-secondary"><path d="M6 2L3 6v15a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6z"/></svg>
     `, '720p', 'quality-btn', 'Set output quality');
 
-    const styleBtn = createControlBtn(`
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="opacity-60 text-secondary"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.7-.8 1.7-1.7 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.8-1.7 1.7-1.7h2c3.1 0 5.6-2.5 5.6-5.6C22 6 17.5 2 12 2z"/></svg>
-    `, 'Style: All', 'style-btn', 'Pick a style to see the models that fit it');
-
-    controlsLeft.appendChild(styleBtn);
     controlsLeft.appendChild(modelBtn);
     controlsLeft.appendChild(arBtn);
     controlsLeft.appendChild(qualityBtn);
@@ -203,15 +214,6 @@ export function ImageStudio() {
     `, 'Advanced', 'advanced-btn', 'Show advanced options');
     controlsLeft.appendChild(advancedBtn);
 
-    // Saved character: its photos become the reference images (switches to image-to-image).
-    const characterBtn = createCharacterButton({
-        onPick: (c) => {
-            picker.setMaxImages(getMaxImagesForI2IModel(imageMode ? selectedModel : i2iModels[0].id));
-            picker.setImages(c.portraits);
-        },
-    });
-    controlsLeft.appendChild(characterBtn.element);
-    
     // Quick Tools toggle button
     const toolsBtn = createControlBtn(`
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="opacity-60 text-secondary"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
@@ -664,7 +666,7 @@ export function ImageStudio() {
                             <input type="text" id="model-search" placeholder="Search models..." class="bg-transparent border-none text-xs text-white focus:ring-0 w-full p-0">
                         </div>
                     </div>
-                    <div class="text-[10px] font-bold text-secondary uppercase tracking-widest px-3 py-2 shrink-0">Available models${selectedStyle !== 'all' ? ` · ${IMAGE_STYLES.find(s => s.id === selectedStyle).label}` : ''}</div>
+                    <div class="text-[10px] font-bold text-secondary uppercase tracking-widest px-3 py-2 shrink-0">Best models for ${esc(setupSummary())}</div>
                     <div id="model-list-container" class="flex flex-col gap-1.5 overflow-y-auto custom-scrollbar pr-1 pb-2"></div>
                 </div>
             `;
@@ -672,9 +674,13 @@ export function ImageStudio() {
 
             const renderModels = (filter = '') => {
                 list.innerHTML = '';
-                const filtered = sortByPriceDesc(filterByStyle(getCurrentModels(), selectedStyle)).filter(m => m.name.toLowerCase().includes(filter.toLowerCase()) || m.id.toLowerCase().includes(filter.toLowerCase()));
+                const st = setup.getState();
+                const lf = filter.toLowerCase();
+                const results = fitModels(getCurrentModels(), { style: st.style, locks: st.locks, refCount: st.refCount })
+                    .filter(r => r.model.name.toLowerCase().includes(lf) || r.model.id.toLowerCase().includes(lf));
+                if (!results.length) list.innerHTML = '<div class="text-xs text-secondary p-3">No model fits this look and lock. Try another look.</div>';
 
-                filtered.forEach(m => {
+                results.forEach(({ model: m, fit, overLimit }) => {
                     const item = document.createElement('div');
                     item.className = `flex items-center justify-between p-3.5 hover:bg-white/5 rounded-2xl cursor-pointer transition-all border border-transparent hover:border-white/5 ${selectedModel === m.id ? 'bg-white/5 border-white/5' : ''}`;
                     item.innerHTML = `
@@ -682,6 +688,8 @@ export function ImageStudio() {
                              <div class="w-10 h-10 ${m.family === 'kontext' ? 'bg-blue-500/10 text-blue-400' : m.family === 'effects' ? 'bg-purple-500/10 text-purple-400' : 'bg-primary/10 text-primary'} border border-white/5 rounded-xl flex items-center justify-center font-black text-sm shadow-inner uppercase">${m.name.charAt(0)}</div>
                              <div class="flex flex-col gap-0.5">
                                 <span class="text-xs font-bold text-white tracking-tight">${m.name}</span>
+                                ${fit?.note ? `<span class="text-[10px] text-secondary">${esc(fit.note)}</span>` : ''}
+                                ${overLimit ? `<span class="text-[10px] text-[#ff6b6b]">Takes up to ${fit.refs} photos</span>` : ''}
                              </div>
                         </div>
                         <div class="flex items-center gap-2">
@@ -689,9 +697,11 @@ export function ImageStudio() {
                             ${selectedModel === m.id ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff2d2d" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
                         </div>
                     `;
+                    if (overLimit) item.classList.add('opacity-50');
                     item.onclick = (e) => {
                         e.stopPropagation();
                         applyModel(m);
+                        syncSetup();
                         closeDropdown();
                     };
                     list.appendChild(item);
@@ -727,30 +737,6 @@ export function ImageStudio() {
                     e.stopPropagation();
                     selectedAr = r;
                     document.getElementById('ar-btn-label').textContent = r;
-                    closeDropdown();
-                };
-                list.appendChild(item);
-            });
-            dropdown.appendChild(list);
-        } else if (type === 'style') {
-            dropdown.classList.add('max-w-[240px]');
-            dropdown.innerHTML = `<div class="text-[10px] font-bold text-secondary uppercase tracking-widest px-3 py-2 border-b border-white/5 mb-2">Image style</div>`;
-            const list = document.createElement('div');
-            list.className = 'flex flex-col gap-1';
-            const pool = getCurrentModels();
-            IMAGE_STYLES.forEach(st => {
-                const count = filterByStyle(pool, st.id).length;
-                const item = document.createElement('div');
-                item.className = 'flex items-center justify-between p-3 hover:bg-white/5 rounded-2xl cursor-pointer transition-all group';
-                item.title = st.hint || 'Show every model';
-                item.innerHTML = `<span class="text-xs font-bold text-white opacity-80 group-hover:opacity-100"></span><span class="flex items-center gap-2"><span class="text-[10px] text-muted">${count} model${count === 1 ? '' : 's'}</span>${selectedStyle === st.id ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff2d2d" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}</span>`;
-                item.firstElementChild.textContent = st.label;
-                item.onclick = (e) => {
-                    e.stopPropagation();
-                    selectedStyle = st.id;
-                    document.getElementById('style-btn-label').textContent = `Style: ${st.id === 'all' ? 'All' : st.label}`;
-                    const current = pool.find(m => m.id === selectedModel);
-                    if (!current || !fitsStyle(current, st.id)) applyModel(pickForStyle(pool, selectedModel, st.id));
                     closeDropdown();
                 };
                 list.appendChild(item);
@@ -822,15 +808,6 @@ export function ImageStudio() {
         else {
             dropdownOpen = 'ar';
             showDropdown('ar', arBtn);
-        }
-    };
-
-    styleBtn.onclick = (e) => {
-        e.stopPropagation();
-        if (dropdownOpen === 'style') closeDropdown();
-        else {
-            dropdownOpen = 'style';
-            showDropdown('style', styleBtn);
         }
     };
 
@@ -1092,7 +1069,7 @@ export function ImageStudio() {
         picker.setMaxImages(1);
         // Reset to t2i mode
         imageMode = false;
-        { const first = pickForStyle(t2iModels, '', selectedStyle); selectedModel = first.id; selectedModelName = first.name; }
+        { const first = bestOf(t2iModels); selectedModel = first.id; selectedModelName = first.name; }
         selectedAr = getAspectRatiosForModel(selectedModel)[0];
         document.getElementById('model-btn-label').textContent = selectedModelName;
         document.getElementById('ar-btn-label').textContent = selectedAr;
@@ -1107,11 +1084,10 @@ export function ImageStudio() {
     // reference-image models fall back to the first text-to-image model.
     const resetInputs = () => {
         picker.reset();
-        characterBtn.reset();
         uploadedImageUrls = [];
         if (imageMode) {
             imageMode = false;
-            { const first = pickForStyle(t2iModels, '', selectedStyle); selectedModel = first.id; selectedModelName = first.name; }
+            { const first = bestOf(t2iModels); selectedModel = first.id; selectedModelName = first.name; }
             selectedAr = getAspectRatiosForModel(selectedModel)[0];
             document.getElementById('model-btn-label').textContent = selectedModelName;
             document.getElementById('ar-btn-label').textContent = selectedAr;
@@ -1137,6 +1113,33 @@ export function ImageStudio() {
         if (imageMode) picker.setMaxImages(getMaxImagesForI2IModel(selectedModel));
     }
 
+    const setupSummary = () => {
+        const st = setup.getState();
+        const locks = [st.characterOn ? 'Character' : '', st.itemOn ? 'Item' : ''].filter(Boolean);
+        return [st.style === 'any' ? 'any look' : st.styleLabel, locks.length ? `${locks.join(' + ')} lock` : ''].filter(Boolean).join(' · ');
+    };
+    const extraPrompt = () => {
+        const st = setup.getState();
+        return joinPrompt(st.styleHint, st.locks ? lockInstruction(st.characters, st.items) : '');
+    };
+    const syncSetup = () => {
+        const st = setup.getState();
+        const fit = fitInfo(selectedModel);
+        setup.setLimit(st.locks && fit?.refs ? { max: fit.refs, model: selectedModelName } : null);
+        const extra = extraPrompt();
+        alsoSent.classList.toggle('hidden', !extra);
+        alsoSent.textContent = extra ? `Added to your prompt: ${extra}` : '';
+    };
+    const onSetupChange = () => {
+        const st = setup.getState();
+        picker.trigger.style.display = st.locks ? 'none' : '';
+        if (st.locks && imageMode) { picker.reset(); uploadedImageUrls = []; imageMode = false; }
+        const best = pickBest(fitModels(getCurrentModels(), { style: st.style, locks: st.locks, refCount: st.refCount }), selectedModel);
+        if (best && best.id !== selectedModel) applyModel(best);
+        syncSetup();
+        refreshCost();
+    };
+
     // ==========================================
     // 5. GENERATION LOGIC
     // ==========================================
@@ -1154,6 +1157,15 @@ export function ImageStudio() {
             }
         }
 
+        const lockState = setup.getState();
+        if (lockState.locks) {
+            if (!prompt) { alert('Describe the image you want — the locked photos are kept as they are.'); return; }
+            if (lockState.uploading) { alert('Photos are still uploading — one moment.'); return; }
+            if (!lockState.refCount) { alert('Add at least one photo to the character/item lock, or turn the lock off.'); return; }
+            const fit = fitInfo(selectedModel);
+            if (fit && lockState.refCount > fit.refs) { alert(`${selectedModelName} keeps up to ${fit.refs} photos. Remove some or pick another model.`); return; }
+        }
+
         const apiKey = localStorage.getItem('kie_key');
         const cfLogged = !!localStorage.getItem('cf_backend');
         if (!apiKey && !cfLogged) {
@@ -1164,15 +1176,14 @@ export function ImageStudio() {
         // Snapshot this run, then clear the form so the next prompt can start immediately.
         const submittedModel = selectedModel;
         const submittedAr = selectedAr;
-        const submittedImages = uploadedImageUrls.slice();
-        const submittedImageMode = imageMode;
+        const submittedImages = lockState.locks ? lockState.refs.slice() : uploadedImageUrls.slice();
+        const submittedImageMode = imageMode || lockState.locks;
         const qualityLabel = document.getElementById('quality-btn-label')?.textContent;
         const qualityField = getCurrentQualityField(selectedModel);
         const model = getCurrentModels().find(m => m.id === submittedModel);
         const cost = model ? costMeta(model, { resolution: qualityField ? qualityLabel : '' }) : {};
         const historyMeta = { prompt, model: submittedModel, aspect_ratio: submittedAr, ...cost };
-        const styleHint = IMAGE_STYLES.find(st => st.id === selectedStyle)?.hint || '';
-        const promptForModel = joinPrompt(prompt, styleHint);
+        const promptForModel = joinPrompt(prompt, extraPrompt());
 
         const tempId = queueHistory.addPending(historyMeta);
         textarea.value = '';

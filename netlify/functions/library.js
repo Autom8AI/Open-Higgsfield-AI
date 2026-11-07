@@ -74,10 +74,19 @@ exports.handler = guard('library', async function (event) {
   const auth = await requireAccount(event, { requireProviderSetup: false })
   if (auth.error) return json(auth.error.statusCode, auth.error.body)
 
+  // The Generations table is shared, so every library operation must be scoped
+  // to the authenticated Airtable account. Legacy rows without an owner stay
+  // hidden rather than being exposed to whichever account opens the library.
+  const accountId = String(auth.account.id || '')
+  if (!accountId) return json(401, { error: 'AUTH_REQUIRED' })
+  const accountFilter = `FIND('"_accountId":"${accountId}"', {Params})`
+
   if (event.httpMethod === 'DELETE') {
     const id = (event.queryStringParameters || {}).id
     if (!id) return json(400, { error: 'id required' })
     try {
+      const owned = await listRecords(GENERATIONS, { max: 100, filter: accountFilter })
+      if (!owned.some((record) => record.id === id)) return json(404, { error: 'Library item not found.' })
       await deleteRecord(GENERATIONS, id)
       return json(200, { ok: true })
     } catch (error) {
@@ -87,7 +96,7 @@ exports.handler = guard('library', async function (event) {
 
   let records = []
   try {
-    records = await listRecords(GENERATIONS, { sortField: 'Created', max: 100 })
+    records = await listRecords(GENERATIONS, { sortField: 'Created', max: 100, filter: accountFilter })
   } catch (error) {
     return json(200, {
       ok: true,
@@ -106,7 +115,7 @@ exports.handler = guard('library', async function (event) {
         const hasMedia = Array.isArray(record.fields?.Media) && record.fields.Media.length
         return !hasMedia
           && String(params._taskId || '').startsWith('fal:')
-          && (!params._accountId || params._accountId === auth.account.id)
+          && params._accountId === accountId
           && !['FAILED', 'COMPLETED'].includes(String(params._falStatus || '').toUpperCase())
       })
       .map(({ params }) => params._taskId)
@@ -132,7 +141,7 @@ exports.handler = guard('library', async function (event) {
     if (work.length) {
       await Promise.allSettled(work)
       try {
-        const refreshed = await listRecords(GENERATIONS, { sortField: 'Created', max: 100 })
+        const refreshed = await listRecords(GENERATIONS, { sortField: 'Created', max: 100, filter: accountFilter })
         // Keep the original set when the refresh came back empty (e.g. a
         // throttled retry after the parallel sync burst) rather than showing
         // an empty library.

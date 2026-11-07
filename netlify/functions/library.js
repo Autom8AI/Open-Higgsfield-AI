@@ -128,7 +128,7 @@ exports.handler = guard('library', async function (event) {
         const credits = Number(params._credits || 0)
         return taskId
           && !taskId.startsWith('fal:')
-          && (!params._accountId || params._accountId === auth.account.id)
+          && params._accountId === accountId
           && (!hasMedia || credits <= 0)
           && String(record.fields?.Status || '').toLowerCase() !== 'failed'
       })
